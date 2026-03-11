@@ -1,0 +1,58 @@
+---
+title: FAQs
+description: Frequently asked questions about @gentleduck/upload.
+---
+
+## Is React required?
+
+No. The core engine is framework-agnostic. You can use `@gentleduck/upload/core` and `@gentleduck/upload/strategies` without React. The React bindings in `@gentleduck/upload/react` are an optional, thin adapter layer.
+
+## Does it support S3/MinIO uploads?
+
+Yes. The POST strategy handles S3-style presigned form uploads, and the multipart strategy supports S3/MinIO-style chunked uploads with per-part signing.
+
+## Are uploads resumable?
+
+It depends on the strategy. The **multipart** strategy is resumable -- it persists cursor state after each part, so uploads can continue after a page refresh or network interruption. The **POST** strategy is not resumable.
+
+## How does persistence work?
+
+When persistence is configured, the engine serializes in-progress upload state (intent + cursor) to your chosen storage adapter (localStorage, IndexedDB, or in-memory). On page load, items are restored in a `paused` state. Since files cannot be serialized, you need to use the `rebind` command to re-attach the file before resuming.
+
+## What happens when an upload fails?
+
+The engine uses a centralized retry policy (`retryDecision`). By default, uploads are retried up to 3 times. If all attempts are exhausted, the item transitions to an `error` state. You can configure `maxAttempts` in the store config.
+
+## Can I use a custom upload protocol?
+
+Yes. Create a strategy that implements the `start(ctx)` method and register it with the strategy registry. Your backend's `createIntent` should return an intent with a matching `strategy` field.
+
+## How does deduplication work?
+
+If your `UploadApi` implements `findByChecksum`, the engine checks for existing files before uploading. When a match is found, the item is completed immediately via a `dedupe.ok` event without creating a synthetic intent.
+
+## What transport does it use?
+
+The default transport uses XHR (`createXHRTransport`) because it supports upload progress events. You can provide a custom transport implementation if needed.
+
+## How does concurrency work?
+
+The scheduler respects the `maxConcurrentUploads` config (default: 3). When an upload slot opens, the next `queued` item is started. You can adjust this value based on your backend capacity.
+
+## Can I auto-start uploads?
+
+Yes. Pass an `autoStart` function in the config that receives the upload purpose and returns `true` for purposes that should start automatically:
+
+```ts
+const store = createUploadStore({
+  api,
+  strategies,
+  config: {
+    autoStart: (purpose) => purpose === 'avatar',
+  },
+})
+```
+
+## What is the difference between `createUploadStore` and `createUploadClient`?
+
+They are the same. `createUploadClient` is a thin alias for `createUploadStore` to match the "Upload Query" mental model.

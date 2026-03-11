@@ -1,0 +1,9 @@
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://upload.gentleduck.org
+
+# Sitemaps
+Sitemap: https://upload.gentleduck.org/sitemap.xml

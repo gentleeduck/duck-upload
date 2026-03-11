@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "files": [
+    "*.json"
+  ],
+  "name": "@gentleduck/typescript-config",
+  "author": "@gentleduck contributors",
+  "license": "MIT",
+  "homepage": "https://github.com/gentleeduck/duck-upload/tree/master/tooling/typescript#readme",
+  "bugs": {
+    "url": "https://github.com/gentleeduck/duck-upload/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gentleeduck/duck-upload.git",
+    "directory": "tooling/typescript"
+  },
+  "private": true,
+  "version": "0.1.0"
+}

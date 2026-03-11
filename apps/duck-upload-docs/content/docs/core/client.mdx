@@ -1,0 +1,41 @@
+---
+title: Client
+description: UploadClient configuration and plugin system.
+---
+
+The client layer is the public entry point. It normalizes configuration, wires plugins, and returns a stable store interface.
+
+## Create a Client
+
+```ts
+import { createUploadClient } from '@gentleduck/upload/core'
+
+const client = createUploadClient({
+  api,
+  strategies,
+  config: {
+    maxConcurrentUploads: 3,
+    autoStart: (purpose) => purpose === 'avatar',
+  },
+})
+```
+
+`createUploadClient` is a thin alias around `createUploadStore` to match the "Upload Query" mental model.
+
+## Config Defaults
+
+All config fields are optional. Defaults are applied by `resolveUploadConfig`:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `maxConcurrentUploads` | `3` | Maximum number of simultaneous uploads |
+| `progressThrottleMs` | `100` | Minimum interval between progress updates |
+| `maxAttempts` | `3` | Maximum retry attempts per upload |
+| `maxItems` | `100` | Maximum number of items in the store |
+
+## Plugins and Hooks
+
+- **Plugins** attach to `dispatch`, `on`, and `getSnapshot`.
+- **Hooks** can observe internal events for diagnostics.
+
+Keep plugins read-only: do not mutate state directly.

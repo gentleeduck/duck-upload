@@ -1,0 +1,27 @@
+{
+  "name": "gentleduck/upload - Modular, strategy-based file upload engine by Gentleduck",
+  "short_name": "gentleduck/upload",
+  "description": "@gentleduck/upload is a modular, strategy-based file upload engine with React bindings. Resumable uploads, pluggable strategies, and type-safe from backend to UI.",
+  "start_url": "/",
+  "orientation": "any",
+  "categories": ["developer-tools", "productivity", "file-upload", "react", "typescript"],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "display": "standalone"
+}
