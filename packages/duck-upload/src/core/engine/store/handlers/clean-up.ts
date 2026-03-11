@@ -1,11 +1,13 @@
 import type { CursorMap, IntentMap, UploadResultBase } from '../../../contracts'
 import type { UploadState } from '../../reducer'
-import { StoreOptions } from '../store.types'
+import type { StoreOptions } from '../store.types'
 
-export function cleanupOldItems<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  opts: StoreOptions<M, C, P, R>,
-  state: UploadState<M, C, P, R>,
-): UploadState<M, C, P, R> | null {
+export function cleanupOldItems<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase,
+>(opts: StoreOptions<M, C, P, R>, state: UploadState<M, C, P, R>): UploadState<M, C, P, R> | null {
   const maxItems = opts.config.maxItems
   const completedTTL = opts.config.completedItemTTL
   const now = Date.now()
@@ -24,7 +26,12 @@ export function cleanupOldItems<M extends IntentMap, C extends CursorMap<M>, P e
         now - item.completedAt > completedTTL
       ) {
         toRemove.push(localId)
-      } else if (item.phase === 'canceled' && 'canceledAt' in item && typeof item.canceledAt === 'number' && now - item.canceledAt > completedTTL) {
+      } else if (
+        item.phase === 'canceled' &&
+        'canceledAt' in item &&
+        typeof item.canceledAt === 'number' &&
+        now - item.canceledAt > completedTTL
+      ) {
         toRemove.push(localId)
       }
     }

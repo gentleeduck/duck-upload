@@ -25,9 +25,12 @@ import type { InflightUpload, StoreOptions, StoreRuntime } from './store.types'
  *
  * @param opts - Construction options for the store.
  */
-export function createStoreRuntime<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase>(
-  opts: StoreOptions<M, C, P, R>,
-): StoreRuntime<M, C, P, R> {
+export function createStoreRuntime<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+>(opts: StoreOptions<M, C, P, R>): StoreRuntime<M, C, P, R> {
   const resolvedOpts = resolveStoreOptions(opts)
   const persistence = resolvedOpts.persistence
 

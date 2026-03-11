@@ -21,7 +21,7 @@ export function createStrategyRegistry<
       return map[id]
     },
     has(id): id is keyof M & string {
-      return Object.prototype.hasOwnProperty.call(map, id)
+      return Object.hasOwn(map, id)
     },
     set(strategy) {
       map[strategy.id] = strategy

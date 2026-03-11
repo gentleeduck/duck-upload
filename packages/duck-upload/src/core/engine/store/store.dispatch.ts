@@ -3,7 +3,7 @@ import type { UploadCommand } from '../commands.types'
 import { handleAddFiles } from './handlers/add-file'
 import { handleCancel } from './handlers/cancel'
 import { handlePause } from './handlers/pause'
-import { StoreRuntime } from './store.types'
+import type { StoreRuntime } from './store.types'
 
 /**
  * Dispatches a command against the runtime.
@@ -40,7 +40,9 @@ export function dispatch<M extends IntentMap, C extends CursorMap<M>, P extends 
   if (cmd.type === 'cancelAll') {
     const purpose = cmd.purpose
     Array.from(rt.state.items.values())
-      .filter((item) => item.phase !== 'completed' && item.phase !== 'canceled' && (!purpose || item.purpose === purpose))
+      .filter(
+        (item) => item.phase !== 'completed' && item.phase !== 'canceled' && (!purpose || item.purpose === purpose),
+      )
       .forEach((item) => rt.dispatch({ type: 'cancel', localId: item.localId }))
     return
   }

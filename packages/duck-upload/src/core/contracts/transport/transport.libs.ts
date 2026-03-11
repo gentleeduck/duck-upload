@@ -61,7 +61,9 @@ export function makeAbortError(reason: unknown): UploadAbortError {
 export function createNetworkError(xhr: XMLHttpRequest, defaultMessage: string): Error {
   // Status 0 typically indicates CORS failure or network error
   if (xhr.status === 0) {
-    return new Error('CORS error: The upload server does not allow requests from this origin. Please check CORS configuration.')
+    return new Error(
+      'CORS error: The upload server does not allow requests from this origin. Please check CORS configuration.',
+    )
   }
   return new Error(`${defaultMessage} (status: ${xhr.status})`)
 }

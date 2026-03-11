@@ -1,5 +1,10 @@
 import type { UploadError, UploadValidationRules } from '../contracts'
-import { DEFAULT_MAX_ATTEMPTS, DEFAULT_MAX_CONCURRENT_UPLOADS, DEFAULT_MAX_ITEMS, DEFAULT_PROGRESS_THROTTLE_MS } from '../utils/constants'
+import {
+  DEFAULT_MAX_ATTEMPTS,
+  DEFAULT_MAX_CONCURRENT_UPLOADS,
+  DEFAULT_MAX_ITEMS,
+  DEFAULT_PROGRESS_THROTTLE_MS,
+} from '../utils/constants'
 import type { RetryDecision } from './retry.types'
 
 /**

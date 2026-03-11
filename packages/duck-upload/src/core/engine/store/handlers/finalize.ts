@@ -2,10 +2,12 @@ import type { CursorMap, IntentMap, UploadError, UploadResultBase } from '../../
 import { hasIntent, normalizeError, retryDecision, sleep } from '../store.libs'
 import type { StoreRuntime } from '../store.types'
 
-export async function finalizeUpload<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  rt: StoreRuntime<M, C, P, R>,
-  localId: string,
-) {
+export async function finalizeUpload<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase,
+>(rt: StoreRuntime<M, C, P, R>, localId: string) {
   const item = rt.state.items.get(localId)
   if (!item || item.phase !== 'completing') return
   if (rt.inflightCompletes.has(localId)) return

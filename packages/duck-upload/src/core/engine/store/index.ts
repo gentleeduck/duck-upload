@@ -24,9 +24,12 @@ import type { StoreOptions, StoreRuntime, UploadStore } from './store.types'
  * @param opts - Store options (config, backend API, strategies, transport, hooks)
  * @returns A configured {@link UploadStore} instance.
  */
-export function createUploadStore<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase>(
-  opts: StoreOptions<M, C, P, R>,
-): UploadStore<M, C, P, R> {
+export function createUploadStore<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+>(opts: StoreOptions<M, C, P, R>): UploadStore<M, C, P, R> {
   const rt = createStoreRuntime(opts)
 
   // Wire dispatch for handlers that need retries without import cycles.

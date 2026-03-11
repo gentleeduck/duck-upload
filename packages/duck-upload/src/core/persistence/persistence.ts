@@ -1,6 +1,6 @@
 import type { AnyCursor, CursorMap, IntentMap, UploadResultBase } from '../contracts'
 import type { UploadItem } from '../engine/internal-events.types'
-import { UploadState } from '../engine/reducer'
+import type { UploadState } from '../engine/reducer'
 import { hasCursor, hasIntent } from '../engine/store/store.libs'
 import { isRecord } from '../utils/guards'
 import type { PersistedSnapshot, PersistedUploadItem } from './persistence.types'
@@ -10,10 +10,12 @@ import type { PersistedSnapshot, PersistedUploadItem } from './persistence.types
  * Only serializes items that have a valid 'intent', as these are the only ones
  * that can be resumed cleanly.
  */
-export function serializeSnapshot<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  state: UploadState<M, C, P, R>,
-  version: number,
-): PersistedSnapshot<M, C, P> {
+export function serializeSnapshot<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase,
+>(state: UploadState<M, C, P, R>, version: number): PersistedSnapshot<M, C, P> {
   const items: Record<string, PersistedUploadItem<M, C, P>> = {}
 
   for (const item of state.items.values()) {
@@ -63,7 +65,12 @@ export function serializeSnapshot<M extends IntentMap, C extends CursorMap<M>, P
  * - We restore resumable items (those with a cursor) into the `paused` phase,
  *   with `file` left undefined. Your UI can ask the user to rebind the file.
  */
-export function deserializeSnapshot<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
+export function deserializeSnapshot<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase,
+>(
   raw: unknown,
   opts: {
     isPurpose?: (value: string) => value is P
@@ -92,7 +99,11 @@ export function deserializeSnapshot<M extends IntentMap, C extends CursorMap<M>,
     const totalBytes = parsed.progress?.totalBytes ?? parsed.file.size
     const uploadedBytes = parsed.progress?.uploadedBytes ?? 0
     const pct =
-      typeof parsed.progress?.pct === 'number' ? parsed.progress.pct : totalBytes > 0 ? Math.min(100, Math.max(0, (uploadedBytes / totalBytes) * 100)) : 0
+      typeof parsed.progress?.pct === 'number'
+        ? parsed.progress.pct
+        : totalBytes > 0
+          ? Math.min(100, Math.max(0, (uploadedBytes / totalBytes) * 100))
+          : 0
 
     items.set(parsed.id, {
       phase: 'paused',
@@ -172,7 +183,10 @@ function parseProgress(value: unknown): { uploadedBytes: number; totalBytes: num
   return { uploadedBytes: value.uploadedBytes, totalBytes: value.totalBytes, pct }
 }
 
-function isCursorForRegistry<C extends Record<string, unknown>>(value: unknown, hasStrategy: (value: string) => boolean): value is AnyCursor<C> {
+function isCursorForRegistry<C extends Record<string, unknown>>(
+  value: unknown,
+  hasStrategy: (value: string) => boolean,
+): value is AnyCursor<C> {
   if (!isRecord(value)) return false
   if (typeof value.strategy !== 'string') return false
   if (!hasStrategy(value.strategy)) return false

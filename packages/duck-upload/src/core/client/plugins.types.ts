@@ -7,12 +7,20 @@ import type { UploadStore } from '../engine/store'
  *
  * Use these for diagnostics, analytics, logging, or devtools.
  */
-export type UploadHooks<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase> = {
+export type UploadHooks<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+> = {
   /**
    * Called after internal events are processed (depending on your runtime wiring).
    * Prefer this over subscribing to public events if you need full fidelity.
    */
-  onInternalEvent?: (event: InternalEvent<M, C, P, R>, state: import('../engine/reducer').UploadState<M, C, P, R>) => void
+  onInternalEvent?: (
+    event: InternalEvent<M, C, P, R>,
+    state: import('../engine/reducer').UploadState<M, C, P, R>,
+  ) => void
 }
 
 /**
@@ -21,7 +29,12 @@ export type UploadHooks<M extends IntentMap, C extends CursorMap<M>, P extends s
  * Plugins can subscribe to store events and dispatch commands.
  * They should not reach into internal state mutably.
  */
-export type UploadPlugin<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase> = {
+export type UploadPlugin<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+> = {
   /** Plugin name (for debugging). */
   name: string
 

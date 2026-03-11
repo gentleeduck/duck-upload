@@ -9,7 +9,7 @@
  * @module upload-provider
  */
 
-import { createContext, ReactNode, useContext } from 'react'
+import { createContext, type ReactNode, useContext } from 'react'
 import { type CursorMap, type IntentMap, isRecord, type UploadResultBase } from '../core'
 import type { UploadStore } from '../core/engine/store'
 
@@ -43,13 +43,12 @@ const UploadContext = createContext<unknown | null>(null)
  * </UploadProvider>
  * ```
  */
-export function UploadProvider<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase>({
-  store,
-  children,
-}: {
-  store: UploadStore<M, C, P, R>
-  children: ReactNode
-}): React.JSX.Element {
+export function UploadProvider<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+>({ store, children }: { store: UploadStore<M, C, P, R>; children: ReactNode }): React.JSX.Element {
   return <UploadContext.Provider value={store}>{children}</UploadContext.Provider>
 }
 
@@ -69,12 +68,12 @@ export function UploadProvider<M extends IntentMap, C extends CursorMap<M>, P ex
  * const snapshot = store.getSnapshot()
  * ```
  */
-export function useUploadStore<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase>(): UploadStore<
-  M,
-  C,
-  P,
-  R
-> {
+export function useUploadStore<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+>(): UploadStore<M, C, P, R> {
   const store = useContext(UploadContext)
   if (!store || !isUploadStore<M, C, P, R>(store)) {
     throw new Error('useUploadStore must be used within UploadProvider')

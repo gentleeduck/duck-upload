@@ -2,10 +2,12 @@ import type { AnyCursor, CursorMap, IntentMap, UploadError, UploadResultBase } f
 import { hasCursor, hasFile, hasIntent, normalizeError, retryDecision, sleep } from '../store.libs'
 import type { StoreRuntime } from '../store.types'
 
-export async function runUpload<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  rt: StoreRuntime<M, C, P, R>,
-  localId: string,
-) {
+export async function runUpload<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase,
+>(rt: StoreRuntime<M, C, P, R>, localId: string) {
   const item = rt.state.items.get(localId)
 
   // If the state moved on (or we never had a valid upload), drop any inflight entry.
@@ -48,7 +50,8 @@ export async function runUpload<M extends IntentMap, C extends CursorMap<M>, P e
         strategy = item.intent.strategy
       }
 
-      const cursor = (cur && hasCursor(cur) ? cur.cursor : undefined) || (strategy ? { strategy, value: undefined } : undefined)
+      const cursor =
+        (cur && hasCursor(cur) ? cur.cursor : undefined) || (strategy ? { strategy, value: undefined } : undefined)
 
       if (cursor) applyPaused(cursor)
       return

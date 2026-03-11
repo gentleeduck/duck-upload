@@ -117,8 +117,15 @@ export function hasCursor<M extends IntentMap, C extends CursorMap<M>, P extends
  *
  * Used for best-effort abort calls when canceling multipart uploads.
  */
-export function isMultipartIntent(intent: unknown): intent is { strategy: 'multipart'; fileId: string; uploadId: string; partSize: number } {
-  return isRecord(intent) && intent.strategy === 'multipart' && typeof intent.fileId === 'string' && typeof intent.uploadId === 'string'
+export function isMultipartIntent(
+  intent: unknown,
+): intent is { strategy: 'multipart'; fileId: string; uploadId: string; partSize: number } {
+  return (
+    isRecord(intent) &&
+    intent.strategy === 'multipart' &&
+    typeof intent.fileId === 'string' &&
+    typeof intent.uploadId === 'string'
+  )
 }
 
 /**
@@ -157,6 +164,6 @@ export function retryDecision<P extends string>(
   if (!retryable) return { retryable: false }
 
   // Exponential backoff with cap
-  const delayMs = Math.min(DEFAULT_RETRY_DELAY_MAX_MS, DEFAULT_RETRY_DELAY_BASE_MS * Math.pow(2, ctx.attempt - 1))
+  const delayMs = Math.min(DEFAULT_RETRY_DELAY_MAX_MS, DEFAULT_RETRY_DELAY_BASE_MS * 2 ** (ctx.attempt - 1))
   return { retryable: true, delayMs }
 }

@@ -15,7 +15,9 @@ import type { StoreRuntime } from './store.types'
  *
  * This function is idempotent and safe to call multiple times.
  */
-export function scheduleWork<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(rt: StoreRuntime<M, C, P, R>) {
+export function scheduleWork<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
+  rt: StoreRuntime<M, C, P, R>,
+) {
   if (rt.scheduling) return
   rt.scheduling = true
   try {
@@ -33,9 +35,12 @@ export function scheduleWork<M extends IntentMap, C extends CursorMap<M>, P exte
  * The intent creation itself runs as an async effect and is guarded by
  * {@link StoreRuntime.inflightIntents}.
  */
-export function scheduleIntentCreations<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  rt: StoreRuntime<M, C, P, R>,
-) {
+export function scheduleIntentCreations<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase,
+>(rt: StoreRuntime<M, C, P, R>) {
   for (const item of rt.state.items.values()) {
     if (item.phase !== 'creating_intent') continue
     if (rt.inflightIntents.has(item.localId)) continue
@@ -48,7 +53,12 @@ export function scheduleIntentCreations<M extends IntentMap, C extends CursorMap
  *
  * Finalization runs as an async effect and is guarded by {@link StoreRuntime.inflightCompletes}.
  */
-export function scheduleCompletes<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(rt: StoreRuntime<M, C, P, R>) {
+export function scheduleCompletes<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase,
+>(rt: StoreRuntime<M, C, P, R>) {
   for (const item of rt.state.items.values()) {
     if (item.phase !== 'completing') continue
     if (rt.inflightCompletes.has(item.localId)) continue
@@ -60,7 +70,12 @@ export function scheduleCompletes<M extends IntentMap, C extends CursorMap<M>, P
  * Manages upload concurrency and starts new uploads when slots are available.
  * Respects `maxConcurrentUploads` from config.
  */
-export function scheduleUploads<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(rt: StoreRuntime<M, C, P, R>) {
+export function scheduleUploads<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase,
+>(rt: StoreRuntime<M, C, P, R>) {
   const maxConcurrent = Math.max(1, rt.opts.config.maxConcurrentUploads)
   const active = rt.inflightUploads.size
 

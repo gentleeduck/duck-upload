@@ -3,10 +3,12 @@ import { validateIntent } from '../../validation'
 import { normalizeError, retryDecision, sleep } from '../store.libs'
 import type { StoreRuntime } from '../store.types'
 
-export async function createIntent<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  rt: StoreRuntime<M, C, P, R>,
-  localId: string,
-) {
+export async function createIntent<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase,
+>(rt: StoreRuntime<M, C, P, R>, localId: string) {
   const item = rt.state.items.get(localId)
   if (!item || item.phase !== 'creating_intent') return
   if (rt.inflightIntents.has(localId)) return

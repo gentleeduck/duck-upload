@@ -37,16 +37,25 @@ export interface UploadApi<M extends IntentMap, P extends string, R extends Uplo
       opts?: WithSignal,
     ): Promise<{ url: string; headers?: Record<string, string> }>
 
-    completeMultipart(args: { fileId: string; uploadId: string; parts: Array<{ partNumber: number; etag: string }> }, opts?: WithSignal): Promise<unknown>
+    completeMultipart(
+      args: { fileId: string; uploadId: string; parts: Array<{ partNumber: number; etag: string }> },
+      opts?: WithSignal,
+    ): Promise<unknown>
 
-    listParts?(args: { fileId: string; uploadId: string }, opts?: WithSignal): Promise<Array<{ partNumber: number; etag?: string; size?: number }>>
+    listParts?(
+      args: { fileId: string; uploadId: string },
+      opts?: WithSignal,
+    ): Promise<Array<{ partNumber: number; etag?: string; size?: number }>>
 
     abort?(args: { fileId: string; uploadId: string }, opts?: WithSignal): Promise<void>
   }
 
   // TUS-specific operations (optional, for tus strategy)
   tus?: {
-    create(args: { fileId: string; size: number; filename: string; contentType: string }, opts?: WithSignal): Promise<{ uploadUrl: string }>
+    create(
+      args: { fileId: string; size: number; filename: string; contentType: string },
+      opts?: WithSignal,
+    ): Promise<{ uploadUrl: string }>
 
     getOffset(args: { uploadUrl: string }, opts?: WithSignal): Promise<{ offset: number }>
   }

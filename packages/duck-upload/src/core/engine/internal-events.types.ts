@@ -1,4 +1,13 @@
-import type { AnyCursor, AnyIntent, CursorMap, FileFingerprint, IntentMap, RejectReason, UploadError, UploadResultBase } from '../contracts'
+import type {
+  AnyCursor,
+  AnyIntent,
+  CursorMap,
+  FileFingerprint,
+  IntentMap,
+  RejectReason,
+  UploadError,
+  UploadResultBase,
+} from '../contracts'
 import type { UploadCompletionKind } from './outcome.types'
 import type { UploadProgress } from './progress.types'
 
@@ -10,7 +19,12 @@ import type { UploadProgress } from './progress.types'
  * @typeParam M - Intent map
  * @typeParam C - Cursor map
  */
-export type InternalEvent<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase> =
+export type InternalEvent<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+> =
   | {
       type: 'files.added'
       items: Array<{ localId: string; purpose: P; file: File; fingerprint: FileFingerprint; createdAt: number }>
@@ -42,7 +56,17 @@ export type InternalEvent<M extends IntentMap, C extends CursorMap<M>, P extends
  *
  * Useful for constraints and UI filtering.
  */
-export type UploadPhase = 'validating' | 'creating_intent' | 'ready' | 'queued' | 'uploading' | 'paused' | 'completing' | 'completed' | 'error' | 'canceled'
+export type UploadPhase =
+  | 'validating'
+  | 'creating_intent'
+  | 'ready'
+  | 'queued'
+  | 'uploading'
+  | 'paused'
+  | 'completing'
+  | 'completed'
+  | 'error'
+  | 'canceled'
 
 /**
  * State of a single upload item.
@@ -53,7 +77,12 @@ export type UploadPhase = 'validating' | 'creating_intent' | 'ready' | 'queued' 
  * @typeParam C - Cursor map
  * @typeParam P - Purpose union
  */
-export type UploadItem<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase> =
+export type UploadItem<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+> =
   | {
       /** Validating file against rules. */
       phase: 'validating'

@@ -1,4 +1,12 @@
-import type { AnyCursor, CursorMap, FileFingerprint, IntentMap, RejectReason, UploadError, UploadResultBase } from '../contracts'
+import type {
+  AnyCursor,
+  CursorMap,
+  FileFingerprint,
+  IntentMap,
+  RejectReason,
+  UploadError,
+  UploadResultBase,
+} from '../contracts'
 import type { UploadCompletionKind } from './outcome.types'
 
 /**
@@ -6,7 +14,12 @@ import type { UploadCompletionKind } from './outcome.types'
  *
  * Consumers subscribe via {@link TypedEmitter.on}.
  */
-export type UploadEventMap<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase> = {
+export type UploadEventMap<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+> = {
   'file.added': { localId: string; purpose: P; file: File; fingerprint: FileFingerprint }
   'file.rejected': { file: File; reason: RejectReason }
 

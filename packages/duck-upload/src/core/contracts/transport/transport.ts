@@ -1,5 +1,5 @@
 import { abortReason, createNetworkError, makeAbortError, parseHeaders } from './transport.libs'
-import { UploadTransport } from './transport.types'
+import type { UploadTransport } from './transport.types'
 
 type XhrCommonArgs = {
   url: string
@@ -94,7 +94,8 @@ function xhrRequest(args: {
 
     xhr.onerror = () => settle(() => reject(createNetworkError(xhr, 'Network error during upload')))
 
-    xhr.onabort = () => settle(() => reject(makeAbortError(args.signal?.aborted ? abortReason(args.signal) : 'unknown')))
+    xhr.onabort = () =>
+      settle(() => reject(makeAbortError(args.signal?.aborted ? abortReason(args.signal) : 'unknown')))
 
     xhr.open(args.method, args.url)
 

@@ -4,13 +4,26 @@ import type { UploadCommand } from './commands.types'
 import type { InternalEvent, UploadItem } from './internal-events.types'
 import type { UploadProgress } from './progress.types'
 
-export type UploadState<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase> = {
+export type UploadState<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+> = {
   /** Map of uploads by localId for O(1) lookups */
   items: Map<string, UploadItem<M, C, P, R>>
 }
 
-export function createReducer<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase>() {
-  return function reduce(state: UploadState<M, C, P, R>, event: UploadCommand<P> | InternalEvent<M, C, P, R>): UploadState<M, C, P, R> {
+export function createReducer<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+>() {
+  return function reduce(
+    state: UploadState<M, C, P, R>,
+    event: UploadCommand<P> | InternalEvent<M, C, P, R>,
+  ): UploadState<M, C, P, R> {
     const items = new Map(state.items)
 
     const set = (localId: string, next: UploadItem<M, C, P, R>) => items.set(localId, next)

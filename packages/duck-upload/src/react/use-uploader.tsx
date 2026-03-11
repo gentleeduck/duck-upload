@@ -1,24 +1,44 @@
 'use client'
 
 import * as React from 'react'
-import type { CursorMap, IntentMap, UploadCommand, UploadEventMap, UploadItem, UploadPhase, UploadResultBase } from '../core'
+import type {
+  CursorMap,
+  IntentMap,
+  UploadCommand,
+  UploadEventMap,
+  UploadItem,
+  UploadPhase,
+  UploadResultBase,
+} from '../core'
 import type { UploadStore } from '../core/engine/store'
 import { useUploadStore } from './upload-provider'
 
-export function createUploadFactory<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase>(
-  store: UploadStore<M, C, P, R>,
-) {
+export function createUploadFactory<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+>(store: UploadStore<M, C, P, R>) {
   return () => useUploader<M, C, P, R>(store)
 }
 
-export type PickItemsByPhase<Phase extends UploadPhase> = Extract<UploadItem<IntentMap, CursorMap<IntentMap>, string, UploadResultBase>, { phase: Phase }>
+export type PickItemsByPhase<Phase extends UploadPhase> = Extract<
+  UploadItem<IntentMap, CursorMap<IntentMap>, string, UploadResultBase>,
+  { phase: Phase }
+>
 
 type Uploader<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase> = {
   items: UploadItem<M, C, P, R>[]
   byPhase: Record<string, UploadItem<M, C, P, R>[]>
   dispatch: (cmd: UploadCommand<P>) => void
-  on: <K extends keyof UploadEventMap<M, C, P, R> & string>(type: K, cb: (payload: UploadEventMap<M, C, P, R>[K]) => void) => () => void
-  off: <K extends keyof UploadEventMap<M, C, P, R> & string>(type: K, cb: (payload: UploadEventMap<M, C, P, R>[K]) => void) => () => void
+  on: <K extends keyof UploadEventMap<M, C, P, R> & string>(
+    type: K,
+    cb: (payload: UploadEventMap<M, C, P, R>[K]) => void,
+  ) => () => void
+  off: <K extends keyof UploadEventMap<M, C, P, R> & string>(
+    type: K,
+    cb: (payload: UploadEventMap<M, C, P, R>[K]) => void,
+  ) => () => void
   uploading: UploadItem<M, C, P, R>[]
   paused: UploadItem<M, C, P, R>[]
   completed: UploadItem<M, C, P, R>[]
@@ -26,20 +46,30 @@ type Uploader<M extends IntentMap, C extends CursorMap<M>, P extends string, R e
   ready: UploadItem<M, C, P, R>[]
 }
 
-export function useUploader<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase>(): Uploader<
-  M,
-  C,
-  P,
-  R
->
-export function useUploader<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase>(
-  store: UploadStore<M, C, P, R>,
-): Uploader<M, C, P, R>
-export function useUploader<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase>(
-  _store?: UploadStore<M, C, P, R> | undefined,
-) {
+export function useUploader<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+>(): Uploader<M, C, P, R>
+export function useUploader<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+>(store: UploadStore<M, C, P, R>): Uploader<M, C, P, R>
+export function useUploader<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+>(_store?: UploadStore<M, C, P, R> | undefined) {
   const store = _store ?? useUploadStore<M, C, P, R>()
-  const snapshot = React.useSyncExternalStore(store.subscribe.bind(store), store.getSnapshot.bind(store), store.getSnapshot.bind(store))
+  const snapshot = React.useSyncExternalStore(
+    store.subscribe.bind(store),
+    store.getSnapshot.bind(store),
+    store.getSnapshot.bind(store),
+  )
 
   const items = React.useMemo(() => {
     return Array.from(snapshot.items.values())
@@ -70,7 +100,12 @@ export function useUploader<M extends IntentMap, C extends CursorMap<M>, P exten
   }
 }
 
-export function useUploaderActions<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase>() {
+export function useUploaderActions<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+>() {
   const store = useUploadStore<M, C, P, R>()
 
   const dispatch = React.useMemo(() => store.dispatch.bind(store), [store])

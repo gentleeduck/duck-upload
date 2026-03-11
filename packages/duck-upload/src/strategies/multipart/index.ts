@@ -108,15 +108,23 @@ export function multipartStrategy<
 
         // Normal path: ask backend for this part url
         if (!ctx.api.multipart?.signPart) {
-          throw new Error('multipart.signPart is missing in UploadApi. Implement it to call your backend sign-part endpoint.')
+          throw new Error(
+            'multipart.signPart is missing in UploadApi. Implement it to call your backend sign-part endpoint.',
+          )
         }
 
-        const out = await ctx.api.multipart.signPart({ fileId: intent.fileId, uploadId: intent.uploadId, partNumber }, { signal: ctx.signal })
+        const out = await ctx.api.multipart.signPart(
+          { fileId: intent.fileId, uploadId: intent.uploadId, partNumber },
+          { signal: ctx.signal },
+        )
 
         return { partNumber, url: out.url, headers: out.headers }
       }
 
-      const uploadOne = async (p: { partNumber: number; start: number; end: number }, retryCount = 0): Promise<void> => {
+      const uploadOne = async (
+        p: { partNumber: number; start: number; end: number },
+        retryCount = 0,
+      ): Promise<void> => {
         const maxRetries = 3
         try {
           const blob = ctx.file.slice(p.start, p.end)
@@ -139,7 +147,9 @@ export function multipartStrategy<
 
           const etag = res.etag
           if (!etag) {
-            throw new Error('Missing ETag from upload part response. Ensure MinIO/S3 CORS exposes ETag (Access-Control-Expose-Headers: ETag).')
+            throw new Error(
+              'Missing ETag from upload part response. Ensure MinIO/S3 CORS exposes ETag (Access-Control-Expose-Headers: ETag).',
+            )
           }
 
           finishedBytes += size
@@ -160,10 +170,15 @@ export function multipartStrategy<
           // basic retry for network-ish failures
           if (retryCount < maxRetries) {
             const msg = err instanceof Error ? err.message : String(err)
-            const retryable = /network/i.test(msg) || /timeout/i.test(msg) || /5\d\d/.test(msg) || /ECONNRESET/i.test(msg) || /EHOSTUNREACH/i.test(msg)
+            const retryable =
+              /network/i.test(msg) ||
+              /timeout/i.test(msg) ||
+              /5\d\d/.test(msg) ||
+              /ECONNRESET/i.test(msg) ||
+              /EHOSTUNREACH/i.test(msg)
 
             if (retryable) {
-              await sleep(Math.pow(2, retryCount) * 500)
+              await sleep(2 ** retryCount * 500)
               return uploadOne(p, retryCount + 1)
             }
           }
@@ -196,7 +211,9 @@ export function multipartStrategy<
       async function completeMultipart() {
         if (alreadyCompleted) return
         if (!ctx.api.multipart?.completeMultipart) {
-          throw new Error('multipart.completeMultipart is missing in UploadApi. Implement it to call your backend complete endpoint.')
+          throw new Error(
+            'multipart.completeMultipart is missing in UploadApi. Implement it to call your backend complete endpoint.',
+          )
         }
 
         const parts = Array.from(done.entries())
@@ -207,7 +224,10 @@ export function multipartStrategy<
           throw new Error(`Cannot complete multipart: expected ${totalParts} parts, got ${parts.length}`)
         }
 
-        await ctx.api.multipart.completeMultipart({ fileId: intent.fileId, uploadId: intent.uploadId, parts }, { signal: ctx.signal })
+        await ctx.api.multipart.completeMultipart(
+          { fileId: intent.fileId, uploadId: intent.uploadId, parts },
+          { signal: ctx.signal },
+        )
 
         // Persist "completed" marker so resume doesn't re-complete.
         const snapshot: MultipartCursor = {

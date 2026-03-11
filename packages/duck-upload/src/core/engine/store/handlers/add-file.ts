@@ -19,12 +19,15 @@ import type { StoreRuntime } from '../store.types'
  * @param files - Files selected by the user
  * @param purpose - Upload purpose used for validation/routing
  */
-export function handleAddFiles<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  rt: StoreRuntime<M, C, P, R>,
-  files: File[],
-  purpose: P,
-) {
-  const existingCount = Array.from(rt.state.items.values()).filter((item) => item.purpose === purpose && item.phase !== 'canceled').length
+export function handleAddFiles<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase,
+>(rt: StoreRuntime<M, C, P, R>, files: File[], purpose: P) {
+  const existingCount = Array.from(rt.state.items.values()).filter(
+    (item) => item.purpose === purpose && item.phase !== 'canceled',
+  ).length
 
   const { valid, rejected } = validateFileList(files, purpose, rt.opts.config, existingCount)
 

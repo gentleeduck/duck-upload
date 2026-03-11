@@ -11,12 +11,12 @@ import type {
   UploadTransport,
 } from '../../contracts'
 import type { PersistedSnapshot, PersistenceAdapter } from '../../persistence'
-import { TypedEmitter } from '../../utils/emitter'
+import type { TypedEmitter } from '../../utils/emitter'
 import type { UploadCommand } from '../commands.types'
 import type { UploadEventMap } from '../event-map.types'
 import type { InternalEvent } from '../internal-events.types'
 import type { UploadOutcome } from '../outcome.types'
-import { createReducer, UploadState } from '../reducer'
+import type { createReducer, UploadState } from '../reducer'
 
 /**
  * Upload store interface used by UI adapters and application code.
@@ -30,7 +30,12 @@ import { createReducer, UploadState } from '../reducer'
  * @template C - Cursor map type (keyed by strategy id)
  * @template P - Purpose string union type
  */
-export interface UploadStore<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase> {
+export interface UploadStore<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+> {
   /**
    * Returns the current immutable state snapshot.
    * Useful for React loops or debugging.
@@ -53,13 +58,19 @@ export interface UploadStore<M extends IntentMap, C extends CursorMap<M>, P exte
    * Subscribes to specific events (like 'file.added', 'upload.progress').
    * Wraps the internal typed emitter.
    */
-  on: <K extends keyof UploadEventMap<M, C, P, R> & string>(type: K, cb: (payload: UploadEventMap<M, C, P, R>[K]) => void) => () => void
+  on: <K extends keyof UploadEventMap<M, C, P, R> & string>(
+    type: K,
+    cb: (payload: UploadEventMap<M, C, P, R>[K]) => void,
+  ) => () => void
 
   /**
    * Unsubscribes from specific events (like 'file.added', 'upload.progress').
    * Wraps the internal typed emitter.
    */
-  off: <K extends keyof UploadEventMap<M, C, P, R> & string>(type: K, cb: (payload: UploadEventMap<M, C, P, R>[K]) => void) => () => void
+  off: <K extends keyof UploadEventMap<M, C, P, R> & string>(
+    type: K,
+    cb: (payload: UploadEventMap<M, C, P, R>[K]) => void,
+  ) => () => void
 
   /**
    * Waits for the given localIds to reach a terminal state.
@@ -83,7 +94,12 @@ export interface UploadStore<M extends IntentMap, C extends CursorMap<M>, P exte
  * @template C - Cursor map type (keyed by strategy id)
  * @template P - Purpose string union type
  */
-export interface StoreOptions<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase> {
+export interface StoreOptions<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+> {
   /** Initial state to hydrate from (e.g. from localStorage) */
   initialState?: UploadState<M, C, P, R>
   /** Static configuration rules (defaults are applied). */
@@ -128,7 +144,12 @@ export type DeserializeContext<M extends IntentMap, C extends CursorMap<M>, P ex
   hasStrategy: (value: string) => boolean
 }
 
-export type PersistenceOptions<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase> = {
+export type PersistenceOptions<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase,
+> = {
   /** Persistence key (e.g. localStorage key) */
   key: string
   /** Persistence schema version (not app version) */
@@ -180,7 +201,12 @@ export type InflightUpload = {
  * @template C - Cursor map type
  * @template P - Purpose string union type
  */
-export type StoreRuntime<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase = UploadResultBase> = {
+export type StoreRuntime<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+> = {
   /** Store options */
   opts: StoreOptions<M, C, P, R> & { config: UploadConfig<P>; transport: UploadTransport }
   /** Current state */

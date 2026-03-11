@@ -1100,7 +1100,17 @@ function logRequest(tool: string, params: Record<string, unknown>): void {
 
 // -- Server ------------------------------------------------------------------
 
-const CATEGORY_ENUM = z.enum(['core', 'course', 'react', 'strategies', 'design', 'installation', 'guides', 'general', 'all'])
+const CATEGORY_ENUM = z.enum([
+  'core',
+  'course',
+  'react',
+  'strategies',
+  'design',
+  'installation',
+  'guides',
+  'general',
+  'all',
+])
 
 export function createMcpServer(): McpServer {
   const server = new McpServer(
