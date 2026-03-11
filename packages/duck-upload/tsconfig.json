@@ -16,7 +16,7 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "ES2017",
-    "types": ["next", "@types/node"]
+    "types": []
   },
   "exclude": [],
   "include": ["**/*.ts", "**/*.tsx"]
