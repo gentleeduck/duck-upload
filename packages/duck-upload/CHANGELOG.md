@@ -1,5 +1,11 @@
 # @gentleduck/upload
 
+## 0.2.1
+
+### Patch Changes
+
+- 97606b5: Fix release workflow to skip redundant CI checks during publish.
+
 ## 0.2.0
 
 ### Minor Changes
