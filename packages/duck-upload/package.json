@@ -2,6 +2,9 @@
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@gentleduck/upload",
   "version": "0.2.1",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
