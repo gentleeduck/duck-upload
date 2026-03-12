@@ -1,5 +1,11 @@
 # @gentleduck/upload
 
+## 0.2.2
+
+### Patch Changes
+
+- 0d9dc94: Add publishConfig with public access for scoped npm package.
+
 ## 0.2.1
 
 ### Patch Changes
