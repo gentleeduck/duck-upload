@@ -1,4 +1,5 @@
 import type { TypedEmitter } from './emitter.types'
+export type { TypedEmitter } from './emitter.types'
 
 /**
  * Creates a lightweight, typed event emitter.

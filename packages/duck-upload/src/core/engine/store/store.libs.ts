@@ -32,7 +32,7 @@ export function isAutoStart<M extends IntentMap, C extends CursorMap<M>, P exten
   opts: StoreOptions<M, C, P, R>,
   purpose: P,
 ): boolean {
-  const v = opts.config.autoStart
+  const v = opts.config?.autoStart
   if (v === undefined) return false
   if (Array.isArray(v)) return v.includes(purpose)
   if (typeof v === 'function') return v(purpose)
@@ -73,7 +73,7 @@ export function normalizeError(err: unknown, customNormalizer?: (err: unknown) =
 
   // HTTP errors
   if (isRecord(err) && (typeof err.status === 'number' || typeof err.statusCode === 'number')) {
-    const status = typeof err.status === 'number' ? err.status : err.statusCode
+    const status = (typeof err.status === 'number' ? err.status : err.statusCode) as number
     const retryable = status >= 500 || status === 429
     return { code: 'http', status, message: String(msg), cause: err, retryable }
   }

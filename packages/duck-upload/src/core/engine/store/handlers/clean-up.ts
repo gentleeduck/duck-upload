@@ -8,8 +8,8 @@ export function cleanupOldItems<
   P extends string,
   R extends UploadResultBase,
 >(opts: StoreOptions<M, C, P, R>, state: UploadState<M, C, P, R>): UploadState<M, C, P, R> | null {
-  const maxItems = opts.config.maxItems
-  const completedTTL = opts.config.completedItemTTL
+  const maxItems = opts.config?.maxItems
+  const completedTTL = opts.config?.completedItemTTL
   const now = Date.now()
 
   // Collect items to remove
@@ -39,7 +39,7 @@ export function cleanupOldItems<
 
   // If still over limit, remove oldest completed/canceled items
   const remainingItems = items.filter(([id]) => !toRemove.includes(id))
-  if (remainingItems.length > maxItems) {
+  if (maxItems !== undefined && remainingItems.length > maxItems) {
     const completedOrCanceled = remainingItems
       .filter(([, item]) => item.phase === 'completed' || item.phase === 'canceled')
       .sort(([, a], [, b]) => {
@@ -48,7 +48,7 @@ export function cleanupOldItems<
         return aTime - bTime
       })
 
-    const excess = remainingItems.length - maxItems
+    const excess = remainingItems.length - maxItems!
     for (let i = 0; i < excess && i < completedOrCanceled.length; i++) {
       toRemove.push(completedOrCanceled[i][0])
     }

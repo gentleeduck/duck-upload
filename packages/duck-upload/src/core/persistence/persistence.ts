@@ -1,4 +1,4 @@
-import type { AnyCursor, CursorMap, IntentMap, UploadResultBase } from '../contracts'
+import type { AnyCursor, AnyIntent, CursorMap, IntentMap, UploadResultBase } from '../contracts'
 import type { UploadItem } from '../engine/internal-events.types'
 import type { UploadState } from '../engine/reducer'
 import { hasCursor, hasIntent } from '../engine/store/store.libs'
@@ -22,7 +22,7 @@ export function serializeSnapshot<
     if (!hasIntent(item)) continue
 
     // Do not persist terminal items. Persistence is for resuming and recovery, not history.
-    if (item.phase === 'completed' || item.phase === 'canceled' || item.phase === 'error') continue
+    if ((item.phase as string) === 'completed' || (item.phase as string) === 'canceled' || (item.phase as string) === 'error') continue
 
     const cursor = hasCursor(item) ? item.cursor : undefined
 
@@ -116,13 +116,13 @@ export function deserializeSnapshot<
         lastModified: parsed.file.lastModified,
         checksum: parsed.file.checksum,
       },
-      intent: parsed.intent,
+      intent: parsed.intent as AnyIntent<M>,
       cursor: parsed.cursor,
       progress: { uploadedBytes, totalBytes, pct },
       pausedAt: Date.now(),
       createdAt: raw.createdAt ?? Date.now(),
       file: undefined,
-    })
+    } as UploadItem<M, C, P, R>)
   }
 
   return { items }

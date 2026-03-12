@@ -160,7 +160,7 @@ export function multipartStrategy<
               .map(([partNumber, v]) => ({ partNumber, etag: v.etag, size: v.size }))
               .sort((a, b) => a.partNumber - b.partNumber),
           }
-          ctx.persistCursor(snapshot)
+          ctx.persistCursor(snapshot as C["multipart"])
           report()
         } catch (err) {
           inflightBytes.delete(p.partNumber)
@@ -236,7 +236,7 @@ export function multipartStrategy<
             .sort((a, b) => a.partNumber - b.partNumber),
           completed: true,
         }
-        ctx.persistCursor(snapshot)
+        ctx.persistCursor(snapshot as C["multipart"])
       }
     },
   }

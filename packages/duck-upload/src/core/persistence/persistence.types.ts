@@ -41,7 +41,7 @@ export type PersistedUploadItem<M, C, P extends string> = {
   /** Backend-provided "intent" that describes how to upload (strategy, URLs, fields, etc). */
   intent: M[keyof M]
   /** Strategy cursor used to resume uploads that support continuation. */
-  cursor?: import('../contracts').AnyCursor<C>
+  cursor?: import('../contracts').AnyCursor<C & Record<string, unknown>>
   /** Last-known progress for UX continuity after restoring from persistence. */
   progress?: { uploadedBytes: number; totalBytes: number; pct?: number }
   /** The last known state-machine phase at the time of persistence. */

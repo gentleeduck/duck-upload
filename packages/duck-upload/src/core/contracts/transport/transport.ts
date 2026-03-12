@@ -105,7 +105,7 @@ function xhrRequest(args: {
       }
     }
 
-    xhr.send(args.body)
+    xhr.send(args.body as XMLHttpRequestBodyInit | Document | null)
   })
 }
 

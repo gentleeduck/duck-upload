@@ -1,4 +1,4 @@
-import type { CursorMap, IntentMap, UploadError, UploadResultBase } from '../../../contracts'
+import type { AnyIntent, CursorMap, IntentMap, UploadError, UploadResultBase } from '../../../contracts'
 import { validateIntent } from '../../validation'
 import { normalizeError, retryDecision, sleep } from '../store.libs'
 import type { StoreRuntime } from '../store.types'
@@ -47,7 +47,7 @@ export async function createIntent<
       return
     }
 
-    rt.applyInternal({ type: 'intent.ok', localId, intent })
+    rt.applyInternal({ type: 'intent.ok', localId, intent: intent as AnyIntent<M> })
   } catch (err: unknown) {
     rt.inflightIntents.delete(localId)
 
