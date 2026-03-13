@@ -6,8 +6,8 @@
   "author": "@gentleduck contributors",
   "dependencies": {
     "@gentleduck/typescript-config": "workspace:*",
-    "@vitejs/plugin-react-swc": "^3.11.0",
-    "tsdown": "0.21.2"
+    "@vitejs/plugin-react-swc": "^4.2.3",
+    "tsdown": "0.18.3"
   },
   "description": "Shared tsdown build configuration for duck-upload.",
   "version": "0.0.1",
