@@ -1,4 +1,5 @@
 import type { TypedEmitter } from './emitter.types'
+
 export type { TypedEmitter } from './emitter.types'
 
 /**
@@ -29,7 +30,11 @@ export function createTypedEmitter<E extends Record<string, unknown>>(): TypedEm
   return {
     on<K extends keyof E & string>(type: K, cb: (payload: E[K]) => void): () => void {
       // Create listener set for this event type if it doesn't exist
-      const set = listeners[type] ?? (listeners[type] = new Set<(payload: E[K]) => void>())
+      let set = listeners[type]
+      if (!set) {
+        set = new Set<(payload: E[K]) => void>()
+        listeners[type] = set
+      }
       set.add(cb)
 
       // Return unsubscribe function

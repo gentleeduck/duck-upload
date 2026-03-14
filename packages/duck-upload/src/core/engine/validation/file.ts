@@ -36,7 +36,7 @@ export function validateFile<P extends string>(file: File, purpose: P, config: U
             if (type.endsWith('/*')) {
               // Wildcard match: 'image/*' matches 'image/jpeg', 'image/png', etc.
               const prefix = type.slice(0, -2).toLowerCase()
-              return mimeType.startsWith(prefix + '/')
+              return mimeType.startsWith(`${prefix}/`)
             }
             // Exact match
             return mimeType === type.toLowerCase()

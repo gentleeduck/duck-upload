@@ -11,7 +11,7 @@ import type {
   UploadResultBase,
 } from '../core'
 import type { UploadStore } from '../core/engine/store'
-import { useUploadStore } from './upload-provider'
+import { useOptionalUploadStore, useUploadStore } from './upload-provider'
 
 export function createUploadFactory<
   M extends IntentMap,
@@ -46,6 +46,22 @@ type Uploader<M extends IntentMap, C extends CursorMap<M>, P extends string, R e
   ready: UploadItem<M, C, P, R>[]
 }
 
+/**
+ * Stable action surface for React consumers that need imperative store access.
+ *
+ * This is declared explicitly instead of relying on an inferred object return
+ * type so the generated package declarations do not leak the internal generic
+ * names created by `store.on.bind(store)`.
+ */
+export type UploaderActions<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+> = Pick<UploadStore<M, C, P, R>, 'dispatch' | 'on'> & {
+  store: UploadStore<M, C, P, R>
+}
+
 export function useUploader<
   M extends IntentMap,
   C extends CursorMap<M>,
@@ -63,8 +79,13 @@ export function useUploader<
   C extends CursorMap<M>,
   P extends string,
   R extends UploadResultBase = UploadResultBase,
->(_store?: UploadStore<M, C, P, R> | undefined) {
-  const store = _store ?? useUploadStore<M, C, P, R>()
+>(providedStore?: UploadStore<M, C, P, R> | undefined) {
+  const contextStore = useOptionalUploadStore<M, C, P, R>()
+  const store = providedStore ?? contextStore
+  if (!store) {
+    throw new Error('useUploader must be used within UploadProvider when no store argument is provided')
+  }
+
   const snapshot = React.useSyncExternalStore(
     store.subscribe.bind(store),
     store.getSnapshot.bind(store),
@@ -105,7 +126,7 @@ export function useUploaderActions<
   C extends CursorMap<M>,
   P extends string,
   R extends UploadResultBase = UploadResultBase,
->() {
+>(): UploaderActions<M, C, P, R> {
   const store = useUploadStore<M, C, P, R>()
 
   const dispatch = React.useMemo(() => store.dispatch.bind(store), [store])

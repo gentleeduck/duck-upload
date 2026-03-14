@@ -7,7 +7,7 @@
   "dependencies": {
     "@gentleduck/typescript-config": "workspace:*",
     "@vitejs/plugin-react-swc": "^4.2.3",
-    "tsdown": "0.18.3"
+    "tsdown": "catalog:"
   },
   "description": "Shared tsdown build configuration for duck-upload.",
   "version": "0.0.1",
@@ -36,5 +36,5 @@
     "lint": "biome lint --write ./"
   },
   "type": "module",
-  "types": "dist/index.d.mts"
+  "types": "index.ts"
 }

@@ -22,7 +22,12 @@ export function serializeSnapshot<
     if (!hasIntent(item)) continue
 
     // Do not persist terminal items. Persistence is for resuming and recovery, not history.
-    if ((item.phase as string) === 'completed' || (item.phase as string) === 'canceled' || (item.phase as string) === 'error') continue
+    if (
+      (item.phase as string) === 'completed' ||
+      (item.phase as string) === 'canceled' ||
+      (item.phase as string) === 'error'
+    )
+      continue
 
     const cursor = hasCursor(item) ? item.cursor : undefined
 

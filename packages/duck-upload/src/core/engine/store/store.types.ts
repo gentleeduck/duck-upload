@@ -138,7 +138,7 @@ export interface StoreOptions<
  *
  * Used to configure the upload store persistence layer.
  */
-export type DeserializeContext<M extends IntentMap, C extends CursorMap<M>, P extends string> = {
+export type DeserializeContext<M extends IntentMap, _C extends CursorMap<M>, P extends string> = {
   isPurpose?: (value: string) => value is P
   isIntent?: (value: unknown) => value is M[keyof M]
   hasStrategy: (value: string) => boolean
