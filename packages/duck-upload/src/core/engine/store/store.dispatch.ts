@@ -25,7 +25,9 @@ export function dispatch<M extends IntentMap, C extends CursorMap<M>, P extends 
     const purpose = cmd.purpose
     Array.from(rt.state.items.values())
       .filter((item) => item.phase === 'ready' && (!purpose || item.purpose === purpose))
-      .forEach((item) => rt.dispatch({ type: 'start', localId: item.localId }))
+      .forEach((item) => {
+        rt.dispatch({ type: 'start', localId: item.localId })
+      })
     return
   }
 
@@ -33,7 +35,9 @@ export function dispatch<M extends IntentMap, C extends CursorMap<M>, P extends 
     const purpose = cmd.purpose
     Array.from(rt.state.items.values())
       .filter((item) => item.phase === 'uploading' && (!purpose || item.purpose === purpose))
-      .forEach((item) => rt.dispatch({ type: 'pause', localId: item.localId }))
+      .forEach((item) => {
+        rt.dispatch({ type: 'pause', localId: item.localId })
+      })
     return
   }
 
@@ -43,7 +47,9 @@ export function dispatch<M extends IntentMap, C extends CursorMap<M>, P extends 
       .filter(
         (item) => item.phase !== 'completed' && item.phase !== 'canceled' && (!purpose || item.purpose === purpose),
       )
-      .forEach((item) => rt.dispatch({ type: 'cancel', localId: item.localId }))
+      .forEach((item) => {
+        rt.dispatch({ type: 'cancel', localId: item.localId })
+      })
     return
   }
 

@@ -31,6 +31,19 @@ export const metadata: Metadata = {
   ...METADATA,
 }
 
+const FONT_TYPE_SCRIPT = `
+  (function() {
+    try {
+      var raw = localStorage.getItem('fontType');
+      var fontType = raw ? JSON.parse(raw) : 'mono';
+      var family = fontType === 'sans'
+        ? 'var(--font-geist-sans, "Geist"), sans-serif'
+        : 'var(--font-geist-mono, "Geist Mono"), monospace';
+      document.documentElement.style.setProperty('font-family', family, 'important');
+    } catch (e) {}
+  })();
+`
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html className={`${GeistSans.variable} ${GeistMono.variable}`} dir="ltr" lang="en" suppressHydrationWarning>
@@ -39,22 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <script crossOrigin="anonymous" src="//unpkg.com/react-scan/dist/auto.global.js" />
         )}
 
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var raw = localStorage.getItem('fontType');
-                  var fontType = raw ? JSON.parse(raw) : 'mono';
-                  var family = fontType === 'sans'
-                    ? 'var(--font-geist-sans, "Geist"), sans-serif'
-                    : 'var(--font-geist-mono, "Geist Mono"), monospace';
-                  document.documentElement.style.setProperty('font-family', family, 'important');
-                } catch (e) {}
-              })();
-            `,
-          }}
-        />
+        <script>{FONT_TYPE_SCRIPT}</script>
       </head>
       <body className={cn('duck min-h-svh bg-background antialiased')}>
         <KeyProvider timeoutMs={100}>

@@ -91,7 +91,9 @@ export function createStoreRuntime<
     scheduling: false,
 
     notify() {
-      rt.listeners.forEach((l) => l())
+      rt.listeners.forEach((listener) => {
+        listener()
+      })
     },
 
     scheduleWork() {

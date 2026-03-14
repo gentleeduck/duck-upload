@@ -17,16 +17,18 @@ export function DocsPathBreadcrumb({ segments }: { segments: string[] }) {
 
   return (
     <nav aria-label="Page path" className="hidden items-center gap-2 text-muted-foreground text-sm md:flex">
-      {segments.map((segment, index) => (
-        <div className="flex items-center gap-2" key={`${segment}-${index}`}>
-          {index > 0 && <ChevronRightIcon aria-hidden="true" className="size-4" />}
-          <Link
-            className="transition-colors hover:text-foreground"
-            href={`/docs/${segments.slice(0, index + 1).join('/')}`}>
-            {toTitleCase(segment)}
-          </Link>
-        </div>
-      ))}
+      {segments.map((segment, index) => {
+        const href = `/docs/${segments.slice(0, index + 1).join('/')}`
+
+        return (
+          <div className="flex items-center gap-2" key={href}>
+            {index > 0 && <ChevronRightIcon aria-hidden="true" className="size-4" />}
+            <Link className="transition-colors hover:text-foreground" href={href}>
+              {toTitleCase(segment)}
+            </Link>
+          </div>
+        )
+      })}
     </nav>
   )
 }

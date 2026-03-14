@@ -48,7 +48,7 @@ export function cleanupOldItems<
         return aTime - bTime
       })
 
-    const excess = remainingItems.length - maxItems!
+    const excess = remainingItems.length - maxItems
     for (let i = 0; i < excess && i < completedOrCanceled.length; i++) {
       toRemove.push(completedOrCanceled[i][0])
     }

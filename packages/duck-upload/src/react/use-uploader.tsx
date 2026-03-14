@@ -11,7 +11,7 @@ import type {
   UploadResultBase,
 } from '../core'
 import type { UploadStore } from '../core/engine/store'
-import { useUploadStore } from './upload-provider'
+import { useOptionalUploadStore, useUploadStore } from './upload-provider'
 
 export function createUploadFactory<
   M extends IntentMap,
@@ -79,8 +79,13 @@ export function useUploader<
   C extends CursorMap<M>,
   P extends string,
   R extends UploadResultBase = UploadResultBase,
->(_store?: UploadStore<M, C, P, R> | undefined) {
-  const store = _store ?? useUploadStore<M, C, P, R>()
+>(providedStore?: UploadStore<M, C, P, R> | undefined) {
+  const contextStore = useOptionalUploadStore<M, C, P, R>()
+  const store = providedStore ?? contextStore
+  if (!store) {
+    throw new Error('useUploader must be used within UploadProvider when no store argument is provided')
+  }
+
   const snapshot = React.useSyncExternalStore(
     store.subscribe.bind(store),
     store.getSnapshot.bind(store),

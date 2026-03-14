@@ -53,6 +53,31 @@ export function UploadProvider<
 }
 
 /**
+ * Hook to access the upload store from React context when present.
+ *
+ * Some higher-level hooks support either an explicit store argument or context.
+ * They use this helper so the context read stays unconditional without throwing
+ * when a caller intentionally passes a store instance.
+ */
+export function useOptionalUploadStore<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+>(): UploadStore<M, C, P, R> | null {
+  const store = useContext(UploadContext)
+  if (store === null) {
+    return null
+  }
+
+  if (!isUploadStore<M, C, P, R>(store)) {
+    throw new Error('UploadProvider received an invalid store value')
+  }
+
+  return store
+}
+
+/**
  * Hook to access the upload store from React context.
  *
  * @template M - Intent map type
@@ -74,8 +99,8 @@ export function useUploadStore<
   P extends string,
   R extends UploadResultBase = UploadResultBase,
 >(): UploadStore<M, C, P, R> {
-  const store = useContext(UploadContext)
-  if (!store || !isUploadStore<M, C, P, R>(store)) {
+  const store = useOptionalUploadStore<M, C, P, R>()
+  if (!store) {
     throw new Error('useUploadStore must be used within UploadProvider')
   }
   return store
