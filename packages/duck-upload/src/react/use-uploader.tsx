@@ -46,6 +46,22 @@ type Uploader<M extends IntentMap, C extends CursorMap<M>, P extends string, R e
   ready: UploadItem<M, C, P, R>[]
 }
 
+/**
+ * Stable action surface for React consumers that need imperative store access.
+ *
+ * This is declared explicitly instead of relying on an inferred object return
+ * type so the generated package declarations do not leak the internal generic
+ * names created by `store.on.bind(store)`.
+ */
+export type UploaderActions<
+  M extends IntentMap,
+  C extends CursorMap<M>,
+  P extends string,
+  R extends UploadResultBase = UploadResultBase,
+> = Pick<UploadStore<M, C, P, R>, 'dispatch' | 'on'> & {
+  store: UploadStore<M, C, P, R>
+}
+
 export function useUploader<
   M extends IntentMap,
   C extends CursorMap<M>,
@@ -105,7 +121,7 @@ export function useUploaderActions<
   C extends CursorMap<M>,
   P extends string,
   R extends UploadResultBase = UploadResultBase,
->() {
+>(): UploaderActions<M, C, P, R> {
   const store = useUploadStore<M, C, P, R>()
 
   const dispatch = React.useMemo(() => store.dispatch.bind(store), [store])
