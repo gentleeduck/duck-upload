@@ -22,7 +22,11 @@ export const docsConfig = {
         },
         {
           href: '/docs/guides',
-          title: 'Guides',
+          title: 'Quick Start',
+        },
+        {
+          href: '/docs/faqs',
+          title: 'FAQs',
         },
       ],
       title: 'Getting Started',
@@ -36,15 +40,15 @@ export const docsConfig = {
         },
         {
           href: '/docs/core/engine',
-          title: 'Engine',
+          title: 'Engine & State Machine',
         },
         {
           href: '/docs/core/client',
-          title: 'Client',
+          title: 'Client & Config',
         },
         {
           href: '/docs/core/contracts',
-          title: 'Contracts',
+          title: 'Contracts & Interfaces',
         },
         {
           href: '/docs/core/persistence',
@@ -55,7 +59,7 @@ export const docsConfig = {
           title: 'Utilities',
         },
       ],
-      title: 'Core',
+      title: 'Core Concepts',
     },
     {
       collapsible: false,
@@ -83,16 +87,16 @@ export const docsConfig = {
           title: 'Overview',
         },
         {
-          href: '/docs/strategies/multipart',
-          title: 'Multipart (S3/MinIO)',
-        },
-        {
           href: '/docs/strategies/post',
           title: 'POST (Presigned)',
         },
         {
+          href: '/docs/strategies/multipart',
+          title: 'Multipart (S3/MinIO)',
+        },
+        {
           href: '/docs/strategies/registry',
-          title: 'Registry',
+          title: 'Strategy Registry',
         },
       ],
       title: 'Strategies',
@@ -101,57 +105,53 @@ export const docsConfig = {
       collapsible: false,
       items: [
         {
-          href: '/docs/course',
-          title: 'Overview',
-        },
-        {
-          href: '/docs/course/chapter-1',
-          title: 'Your First Upload',
-        },
-        {
-          href: '/docs/course/chapter-2',
-          title: 'Strategies & Backends',
-        },
-        {
-          href: '/docs/course/chapter-3',
-          title: 'React Integration',
-        },
-        {
-          href: '/docs/course/chapter-4',
-          title: 'Multipart Uploads',
-        },
-        {
-          href: '/docs/course/chapter-5',
-          title: 'Pause, Resume & Retry',
-        },
-        {
-          href: '/docs/course/chapter-6',
-          title: 'Persistence & Offline',
-        },
-        {
-          href: '/docs/course/chapter-7',
-          title: 'Validation & Plugins',
-        },
-        {
-          href: '/docs/course/chapter-8',
-          title: 'Production Patterns',
+          href: '/docs/design',
+          title: 'Design Decisions',
         },
       ],
-      title: 'Course',
+      title: 'Advanced',
     },
     {
       collapsible: false,
       items: [
         {
-          href: '/docs/design',
-          title: 'Design Decisions',
+          href: '/docs/course',
+          title: 'Course Overview',
         },
         {
-          href: '/docs/faqs',
-          title: 'FAQs',
+          href: '/docs/course/chapter-1',
+          title: '1. Your First Upload',
+        },
+        {
+          href: '/docs/course/chapter-2',
+          title: '2. Strategies & Backends',
+        },
+        {
+          href: '/docs/course/chapter-3',
+          title: '3. React Integration',
+        },
+        {
+          href: '/docs/course/chapter-4',
+          title: '4. Multipart Uploads',
+        },
+        {
+          href: '/docs/course/chapter-5',
+          title: '5. Pause, Resume & Retry',
+        },
+        {
+          href: '/docs/course/chapter-6',
+          title: '6. Persistence & Offline',
+        },
+        {
+          href: '/docs/course/chapter-7',
+          title: '7. Validation & Plugins',
+        },
+        {
+          href: '/docs/course/chapter-8',
+          title: '8. Production Patterns',
         },
       ],
-      title: 'Architecture',
+      title: 'Course',
     },
   ],
 } satisfies DocsConfig
