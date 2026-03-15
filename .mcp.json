@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "duck-upload-docs": {
+      "type": "url",
+      "url": "https://upload.gentleduck.org/api/mcp"
+    }
+  }
+}
