@@ -5,9 +5,9 @@ import { Announcement } from '~/components/announcement'
 import { FeaturesSection } from '~/components/layouts/features'
 import { SponsorsSection } from '~/components/layouts/sponsors'
 
-const title = 'duck-upload -- modular file upload engine'
+const title = 'File uploads, solved for good.'
 const description =
-  '@gentleduck/upload is a modular, strategy-based file upload engine with React bindings. Resumable uploads, pluggable strategies, and type-safe from backend to UI.'
+  'A strategy-based upload engine with resumable transfers, pluggable backends, and React bindings that are type-safe from presigned URL to progress bar.'
 
 export const dynamic = 'force-static'
 export const revalidate = false
