@@ -5,7 +5,7 @@ import { Announcement } from '~/components/announcement'
 import { FeaturesSection } from '~/components/layouts/features'
 import { SponsorsSection } from '~/components/layouts/sponsors'
 
-const title = 'File uploads, solved for good.'
+const title = 'Resumable, type-safe file uploads that just work out of the box.'
 const description =
   'A strategy-based upload engine with resumable transfers, pluggable backends, and React bindings that are type-safe from presigned URL to progress bar.'
 
