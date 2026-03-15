@@ -1,5 +1,11 @@
 # @gentleduck/upload
 
+## 0.2.3
+
+### Patch Changes
+
+- 4950212: Stabilize the published React declaration surface by giving `useUploaderActions()` an explicit return type and align the shared tsdown config package with the repo's runtime tsdown version.
+
 ## 0.2.2
 
 ### Patch Changes
