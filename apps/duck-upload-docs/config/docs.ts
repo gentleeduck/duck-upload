@@ -108,6 +108,10 @@ export const docsConfig = {
           href: '/docs/design',
           title: 'Design Decisions',
         },
+        {
+          href: '/docs/skills',
+          title: 'Agent Skills',
+        },
       ],
       title: 'Advanced',
     },
