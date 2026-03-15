@@ -273,14 +273,19 @@ interface UploadApi<M extends IntentMap, P extends string, R extends UploadResul
   complete(args: { fileId: string }, opts?: WithSignal): Promise<R>
 
   // Optional
-  getSignedPreviewUrl?(args: { fileId: string; key: string; purpose: P }): Promise<string>
-  findByChecksum?(args: { checksum: string; purpose: P }): Promise<R | null>
+  getSignedPreviewUrl?(args: { fileId: string; key: string; purpose: P }, opts?: WithSignal): Promise<string>
+  findByChecksum?(args: { checksum: string; purpose: P }, opts?: WithSignal): Promise<R | null>
 
   multipart?: {
-    signPart(args: { fileId: string; uploadId: string; partNumber: number }): Promise<{ url: string; headers?: Record<string, string> }>
-    completeMultipart(args: { fileId: string; uploadId: string; parts: Array<{ partNumber: number; etag: string }> }): Promise<unknown>
-    listParts?(args: { fileId: string; uploadId: string }): Promise<Array<{ partNumber: number; etag?: string; size?: number }>>
-    abort?(args: { fileId: string; uploadId: string }): Promise<void>
+    signPart(args: { fileId: string; uploadId: string; partNumber: number; checksum?: string }, opts?: WithSignal): Promise<{ url: string; headers?: Record<string, string> }>
+    completeMultipart(args: { fileId: string; uploadId: string; parts: Array<{ partNumber: number; etag: string }> }, opts?: WithSignal): Promise<unknown>
+    listParts?(args: { fileId: string; uploadId: string }, opts?: WithSignal): Promise<Array<{ partNumber: number; etag?: string; size?: number }>>
+    abort?(args: { fileId: string; uploadId: string }, opts?: WithSignal): Promise<void>
+  }
+
+  tus?: {
+    create(args: { fileId: string; size: number; filename: string; contentType: string }, opts?: WithSignal): Promise<{ uploadUrl: string }>
+    getOffset(args: { uploadUrl: string }, opts?: WithSignal): Promise<{ offset: number }>
   }
 }
 ```
@@ -290,7 +295,7 @@ interface UploadApi<M extends IntentMap, P extends string, R extends UploadResul
 ## Persistence
 
 ```ts
-import { createLocalStorageAdapter, createIndexedDBAdapter, createMemoryAdapter } from '@gentleduck/upload/core'
+import { LocalStorageAdapter, IndexedDBAdapter, MemoryAdapter } from '@gentleduck/upload/core'
 
 const client = createUploadClient({
   // ...
@@ -298,7 +303,7 @@ const client = createUploadClient({
     key: 'my-uploads',
     version: 1,
     debounceMs: 200,
-    adapter: createLocalStorageAdapter(),
+    adapter: LocalStorageAdapter, // or IndexedDBAdapter, MemoryAdapter
   },
 })
 ```
