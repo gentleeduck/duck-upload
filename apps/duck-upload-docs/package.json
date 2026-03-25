@@ -30,7 +30,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "tailwindcss": "4.2.1",
-    "typescript": "5.9.3",
+    "typescript": "6.0.2",
     "velite": "^0.3.1"
   },
   "name": "@gentleduck/upload-docs",
