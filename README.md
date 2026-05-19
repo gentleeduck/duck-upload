@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./public/logo-dark.svg" alt="@gentleduck/upload" width="120"/>
+</p>
+
 <h1 align="center">@gentleduck/upload</h1>
 
 <p align="center">
@@ -8,7 +12,7 @@
   <a href="./LICENSE">MIT</a> -
   <a href="./CHANGELOG.md">Changelog</a> -
   <a href="./CONTRIBUTING.md">Contributing</a> -
-  <a href="https://upload.gentleduck.org">Docs</a>
+  <a href="https://gentleduck.org/duck-upload">Docs</a>
 </p>
 
 <p align="center">
@@ -68,7 +72,7 @@ function Avatar() {
 
 | Path | Role |
 | --- | --- |
-| [`apps/duck-upload-docs`](apps/duck-upload-docs) | Docs site at [upload.gentleduck.org](https://upload.gentleduck.org) |
+| [`apps/duck-upload-docs`](apps/duck-upload-docs) | Docs site at [gentleduck.org/duck-upload](https://gentleduck.org/duck-upload) |
 
 ## Build
 
@@ -81,7 +85,7 @@ bunx turbo run check-types --filter='./packages/*'
 
 ## Docs
 
-- Site: [upload.gentleduck.org](https://upload.gentleduck.org)
+- Site: [gentleduck.org/duck-upload](https://gentleduck.org/duck-upload)
 - Sibling repos: [`@gentleduck/ui`](https://github.com/gentleeduck/duck-ui), [`@gentleduck/iam`](https://github.com/gentleeduck/duck-iam), [`@gentleduck/md`](https://github.com/gentleeduck/duck-md)
 
 ## Contributing

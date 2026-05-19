@@ -17,7 +17,7 @@
   "description": "A modular, strategy-based file upload engine with React bindings.",
   "author": "gentleduck contributors",
   "license": "MIT",
-  "homepage": "https://gentleduck.org",
+  "homepage": "https://gentleduck.org/duck-upload",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/gentleeduck/duck-upload.git"

@@ -1,8 +1,27 @@
 <p align="center">
-  <img src="../../public/logo-dark.svg" alt="gentleduck/ui" width="80"/>
+  <img src="../../public/logo-dark.svg" alt="@gentleduck/upload" width="120"/>
 </p>
 
-# @gentleduck/upload
+<h1 align="center">@gentleduck/upload</h1>
+
+<p align="center">
+  Headless, framework-agnostic file-upload engine with a typed state machine, pluggable strategies, and React bindings.
+</p>
+
+<p align="center">
+  <a href="../../LICENSE">MIT</a> -
+  <a href="../../CHANGELOG.md">Changelog</a> -
+  <a href="../../CONTRIBUTING.md">Contributing</a> -
+  <a href="https://gentleduck.org/duck-upload">Docs</a>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@gentleduck/upload"><img src="https://img.shields.io/npm/v/@gentleduck/upload.svg" alt="npm"/></a>
+  <a href="https://www.npmjs.com/package/@gentleduck/upload"><img src="https://img.shields.io/npm/dm/@gentleduck/upload.svg" alt="downloads"/></a>
+  <a href="../../LICENSE"><img src="https://img.shields.io/npm/l/@gentleduck/upload.svg" alt="MIT"/></a>
+</p>
+
+---
 
 Headless, framework-agnostic file-upload engine with a typed state machine, pluggable strategies, and React bindings.
 
