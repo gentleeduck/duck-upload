@@ -1,25 +1,92 @@
+# https://docs.coderabbit.ai/guides/configure-coderabbit
+# Schema: https://coderabbit.ai/integrations/schema.v2.json
 language: en-US
+early_access: false
+tone_instructions: |
+  Terse, technical. Drop filler and hedging. Fragments OK.
+  Code blocks unchanged. Errors quoted exact. No AI slop phrases.
 
 reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: '@coderabbitai summary'
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  changed_files_summary: true
+  sequence_diagrams: true
+  abort_on_close: true
   auto_review:
     enabled: true
     drafts: false
     base_branches:
       - master
+      - main
   path_filters:
-    - "!**/_oldstuff_refactor/**"
-    - "!**/___/**"
-    - "!**/dist/**"
-    - "!**/build/**"
-    - "!**/.next/**"
-    - "!**/__snapshots__/**"
-    - "!**/__ui_registry__/**"
-    - "!**/node_modules/**"
-    - "!**/bun.lock"
-    - "!**/public/sitemap-0.xml"
+    - '!**/node_modules/**'
+    - '!**/dist/**'
+    - '!**/build/**'
+    - '!**/.next/**'
+    - '!**/.turbo/**'
+    - '!**/.velite/**'
+    - '!**/.cache/**'
+    - '!**/coverage/**'
+    - '!**/__snapshots__/**'
+    - '!**/__ui_registry__/**'
+    - '!**/_oldstuff_refactor/**'
+    - '!**/*.lock'
+    - '!**/bun.lock'
+    - '!**/pnpm-lock.yaml'
+    - '!**/package-lock.json'
+  path_instructions:
+    - path: 'packages/duck-upload/src/core/**/*.ts'
+      instructions: |
+        Core upload engine. Validate file size, type, MIME. Stream
+        uploads — never buffer full file in memory. Backpressure
+        aware. Handle abort + resume correctly.
+        No any without justification. Comments explain WHY not WHAT.
+    - path: 'packages/duck-upload/src/strategies/**/*.ts'
+      instructions: |
+        Upload strategy (POST, multipart). Verify chunk integrity.
+        Idempotent retries. Handle network jitter, timeouts,
+        partial uploads. Clean up temp resources on cancel.
+    - path: 'packages/duck-upload/src/react/**/*.{ts,tsx}'
+      instructions: |
+        React bindings. Stable refs. Avoid stale closures over
+        upload state. Cleanup on unmount. Suspense + Server Component
+        compatible where possible.
+    - path: 'packages/duck-upload/src/__test__/**/*.ts'
+      instructions: |
+        Tests. Cover network failures, abort midflight, large files,
+        unicode filenames, special chars in paths. Test concurrent
+        uploads + resume.
+    - path: 'apps/**/*.{ts,tsx}'
+      instructions: |
+        Example/docs app. Show correct usage. Reject antipatterns
+        (no validation, missing abort, leaked file handles).
   tools:
     biome:
+      enabled: true
+    gitleaks:
+      enabled: true
+    semgrep:
+      enabled: true
+    actionlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    markdownlint:
       enabled: true
 
 chat:
   auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: auto
+  issues:
+    scope: auto
+  pull_requests:
+    scope: auto
