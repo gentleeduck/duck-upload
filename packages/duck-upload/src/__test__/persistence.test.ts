@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { UploadState } from '../core/engine/reducer'
-import { MemoryAdapter } from '../core/persistence'
+import { createMemoryAdapter, MemoryAdapter } from '../core/persistence'
 import { deserializeSnapshot, serializeSnapshot } from '../core/persistence/persistence'
 import type { PersistedSnapshot } from '../core/persistence/persistence.types'
 
@@ -152,5 +152,34 @@ describe('MemoryAdapter', () => {
     expect(await MemoryAdapter.load('k')).toEqual({ a: 1 })
     await MemoryAdapter.clear('k')
     expect(await MemoryAdapter.load('k')).toBeNull()
+  })
+})
+
+describe('createMemoryAdapter — SEC-008 factory isolation', () => {
+  test('two factory calls produce isolated state', async () => {
+    const a = createMemoryAdapter()
+    const b = createMemoryAdapter()
+    await a.save('key', { from: 'a' })
+    expect(await b.load('key')).toBeNull()
+    await b.save('key', { from: 'b' })
+    expect(await a.load('key')).toEqual({ from: 'a' })
+    expect(await b.load('key')).toEqual({ from: 'b' })
+  })
+
+  test('clear on one adapter does not affect another', async () => {
+    const a = createMemoryAdapter()
+    const b = createMemoryAdapter()
+    await a.save('shared', 1)
+    await b.save('shared', 2)
+    await a.clear('shared')
+    expect(await a.load('shared')).toBeNull()
+    expect(await b.load('shared')).toBe(2)
+  })
+
+  test('backwards-compat singleton still round-trips', async () => {
+    await MemoryAdapter.save('compat', { v: 1 })
+    expect(await MemoryAdapter.load('compat')).toEqual({ v: 1 })
+    await MemoryAdapter.clear('compat')
+    expect(await MemoryAdapter.load('compat')).toBeNull()
   })
 })
