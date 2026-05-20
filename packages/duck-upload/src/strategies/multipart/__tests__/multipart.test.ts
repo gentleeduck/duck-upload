@@ -43,8 +43,67 @@ describe('validatePartUrl', () => {
     expect(() => validatePartUrl('http://[fc00::1]/x')).toThrow(/private\/loopback/)
   })
 
+  test('rejects IPv6 unspecified :: and multicast ff02::1', () => {
+    expect(() => validatePartUrl('http://[::]/x')).toThrow(/private\/loopback/)
+    expect(() => validatePartUrl('http://[ff02::1]/x')).toThrow(/private\/loopback/)
+  })
+
+  test('rejects IPv4-mapped IPv6 (dotted-quad, canonical hex, fully expanded)', () => {
+    expect(() => validatePartUrl('http://[::ffff:127.0.0.1]/')).toThrow(/private\/loopback/)
+    expect(() => validatePartUrl('http://[::ffff:7f00:1]/')).toThrow(/private\/loopback/)
+    expect(() => validatePartUrl('http://[0:0:0:0:0:ffff:7f00:1]/')).toThrow(/private\/loopback/)
+  })
+
+  test('rejects 6to4 IPv6 carrying a private IPv4 (2002:7f00:1::)', () => {
+    expect(() => validatePartUrl('http://[2002:7f00:1::]/')).toThrow(/private\/loopback/)
+  })
+
+  test('rejects NAT64 IPv6 carrying a private IPv4 (64:ff9b::7f00:1)', () => {
+    expect(() => validatePartUrl('http://[64:ff9b::7f00:1]/')).toThrow(/private\/loopback/)
+  })
+
+  test('rejects AWS cloud-metadata 169.254.169.254', () => {
+    expect(() => validatePartUrl('http://169.254.169.254/latest/meta-data/')).toThrow(/private\/loopback/)
+  })
+
+  test('rejects CGNAT 100.64.0.0/10', () => {
+    expect(() => validatePartUrl('http://100.64.5.5/')).toThrow(/private\/loopback/)
+  })
+
+  test('rejects multicast 224.0.0.0/4 and broadcast 255.255.255.255', () => {
+    expect(() => validatePartUrl('http://224.0.0.1/')).toThrow(/private\/loopback/)
+    expect(() => validatePartUrl('http://255.255.255.255/')).toThrow(/private\/loopback/)
+  })
+
   test('accepts http://127.0.0.1/upload when allowPrivateHosts is true', () => {
     expect(() => validatePartUrl('http://127.0.0.1/upload', { allowPrivateHosts: true })).not.toThrow()
+  })
+
+  test('accepts hardened private/embedded forms when allowPrivateHosts is true', () => {
+    const cases = [
+      'http://[::1]/',
+      'http://[::ffff:127.0.0.1]/',
+      'http://[::ffff:7f00:1]/',
+      'http://[2002:7f00:1::]/',
+      'http://[64:ff9b::7f00:1]/',
+      'http://169.254.169.254/latest/meta-data/',
+      'http://100.64.5.5/',
+      'http://224.0.0.1/',
+      'http://255.255.255.255/',
+      'http://[::]/',
+      'http://[ff02::1]/',
+    ]
+    for (const u of cases) {
+      expect(() => validatePartUrl(u, { allowPrivateHosts: true })).not.toThrow()
+    }
+  })
+
+  test('public URL still flows through (happy path)', () => {
+    expect(() =>
+      validatePartUrl('https://upload.example.com/parts/3', {
+        allowedHosts: ['upload.example.com'],
+      }),
+    ).not.toThrow()
   })
 
   test('allowedHosts: accepts listed host, rejects others', () => {
