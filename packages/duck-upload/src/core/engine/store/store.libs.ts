@@ -9,12 +9,55 @@ export { sleep } from '../../utils/async'
 
 import type { StoreOptions } from './store.types'
 
-/** SHA-256 checksum of `file` for deduplication. */
-export async function calculateFileChecksum(file: File): Promise<string> {
-  const buffer = await file.arrayBuffer()
-  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
+/** Default cap when `config.checksumMaxSize` is unset (`null`) or `0`: 64 MiB. */
+export const DEFAULT_CHECKSUM_MAX_SIZE = 64 * 1024 * 1024
+
+/**
+ * SHA-256 checksum of `file` for deduplication.
+ *
+ * SEC-007: when `file.size` exceeds the resolved cap, bytes are read
+ * via `file.stream()` in chunks instead of allocating the whole file
+ * at once via `file.arrayBuffer()`. Web Crypto `digest` has no
+ * incremental API, so chunks are still concatenated before the final
+ * digest call; the streaming path keeps the *read* allocation pattern
+ * chunked even though peak memory still sees the full buffer for the
+ * digest itself. Callers that cannot afford that should set
+ * `checksumMaxSize` so the upstream effect skips checksum entirely.
+ *
+ * Pass `maxSize = 0` or omit it to use {@link DEFAULT_CHECKSUM_MAX_SIZE}.
+ */
+export async function calculateFileChecksum(file: File, maxSize: number | null = null): Promise<string> {
+  const cap = maxSize && maxSize > 0 ? maxSize : DEFAULT_CHECKSUM_MAX_SIZE
+  const hashBuffer =
+    file.size > cap ? await digestStreamed(file) : await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Read `file` via `stream()` in chunks; digest the concatenated bytes. */
+async function digestStreamed(file: File): Promise<ArrayBuffer> {
+  const reader = file.stream().getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (value) {
+        chunks.push(value)
+        total += value.byteLength
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  const merged = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    merged.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return crypto.subtle.digest('SHA-256', merged)
 }
 
 /**
