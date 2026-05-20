@@ -13,51 +13,49 @@ import type { StoreOptions } from './store.types'
 export const DEFAULT_CHECKSUM_MAX_SIZE = 64 * 1024 * 1024
 
 /**
+ * Module-level dedup set for one-time-per-session `console.info` notices.
+ * Keyed by reason string so each distinct notice fires exactly once for the
+ * lifetime of the JS realm.
+ * @internal exported for tests.
+ */
+export const __checksumNoticesEmitted = new Set<string>()
+
+/**
  * SHA-256 checksum of `file` for deduplication.
  *
- * SEC-007: when `file.size` exceeds the resolved cap, bytes are read
- * via `file.stream()` in chunks instead of allocating the whole file
- * at once via `file.arrayBuffer()`. Web Crypto `digest` has no
- * incremental API, so chunks are still concatenated before the final
- * digest call; the streaming path keeps the *read* allocation pattern
- * chunked even though peak memory still sees the full buffer for the
- * digest itself. Callers that cannot afford that should set
- * `checksumMaxSize` so the upstream effect skips checksum entirely.
+ * SEC-007/018: when `file.size` exceeds the resolved cap, the checksum is
+ * **skipped entirely** and `null` is returned — no I/O is performed on
+ * `file` (neither `arrayBuffer()` nor `stream()` is called). The previous
+ * streaming implementation accumulated every chunk into a `Uint8Array[]`
+ * then concatenated into a single contiguous buffer for `subtle.digest`,
+ * yielding a peak memory of ~2× file size — strictly worse than the
+ * arrayBuffer path it was meant to replace. A bounded-memory streaming
+ * path would require an incremental SHA-256 implementation, which the
+ * Web Crypto API does not provide; vendoring one is out of scope for
+ * this library, so we trade dedupe coverage for a hard memory ceiling.
+ *
+ * Operators that need dedupe on large files should raise `checksumMaxSize`
+ * (accepting the memory cost) or compute fingerprints out-of-band.
  *
  * Pass `maxSize = 0` or omit it to use {@link DEFAULT_CHECKSUM_MAX_SIZE}.
+ *
+ * @returns hex SHA-256 digest, or `null` when `file.size > cap`.
  */
-export async function calculateFileChecksum(file: File, maxSize: number | null = null): Promise<string> {
+export async function calculateFileChecksum(file: File, maxSize: number | null = null): Promise<string | null> {
   const cap = maxSize && maxSize > 0 ? maxSize : DEFAULT_CHECKSUM_MAX_SIZE
-  const hashBuffer =
-    file.size > cap ? await digestStreamed(file) : await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
+  if (file.size > cap) {
+    if (!__checksumNoticesEmitted.has('skipped-oversize')) {
+      __checksumNoticesEmitted.add('skipped-oversize')
+      console.info(
+        '[duck-upload] file exceeds checksumMaxSize; skipping checksum. ' +
+          'Raise `checksumMaxSize` if dedupe coverage is required on large files.',
+      )
+    }
+    return null
+  }
+  const hashBuffer = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-/** Read `file` via `stream()` in chunks; digest the concatenated bytes. */
-async function digestStreamed(file: File): Promise<ArrayBuffer> {
-  const reader = file.stream().getReader()
-  const chunks: Uint8Array[] = []
-  let total = 0
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (value) {
-        chunks.push(value)
-        total += value.byteLength
-      }
-    }
-  } finally {
-    reader.releaseLock()
-  }
-  const merged = new Uint8Array(total)
-  let offset = 0
-  for (const chunk of chunks) {
-    merged.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return crypto.subtle.digest('SHA-256', merged)
 }
 
 /**

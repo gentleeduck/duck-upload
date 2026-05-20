@@ -1,6 +1,7 @@
-import { describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { resolveUploadConfig } from '../core/client'
 import {
+  __checksumNoticesEmitted,
   calculateFileChecksum,
   isAbortError,
   isMultipartIntent,
@@ -121,11 +122,15 @@ describe('isMultipartIntent', () => {
 })
 
 describe('calculateFileChecksum', () => {
+  beforeEach(() => {
+    __checksumNoticesEmitted.clear()
+  })
+
   test('produces a hex digest', async () => {
     const file = new File([new Uint8Array([0, 1, 2, 3])], 'a.bin')
     const h = await calculateFileChecksum(file)
     expect(h).toMatch(/^[0-9a-f]+$/)
-    expect(h.length).toBeGreaterThan(0)
+    expect(h && h.length).toBeGreaterThan(0)
   })
 
   test('different files produce different hashes', async () => {
@@ -136,8 +141,8 @@ describe('calculateFileChecksum', () => {
     expect(ha).not.toBe(hb)
   })
 
-  // SEC-007: honor `checksumMaxSize` by streaming above the cap.
-  test('file at the threshold uses arrayBuffer() (non-streaming path)', async () => {
+  // SEC-007/018: cap is now a *skip* threshold, not a strategy switch.
+  test('file at the threshold uses arrayBuffer() (sub-cap path)', async () => {
     const bytes = new Uint8Array(64)
     for (let i = 0; i < bytes.length; i++) bytes[i] = i
     const file = new File([bytes], 'cap.bin')
@@ -149,29 +154,46 @@ describe('calculateFileChecksum', () => {
     expect(streamSpy).not.toHaveBeenCalled()
   })
 
-  test('file above threshold uses streaming and never calls arrayBuffer()', async () => {
+  test('file below threshold uses arrayBuffer() and produces a digest', async () => {
+    const bytes = new Uint8Array(32)
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 3) & 0xff
+    const file = new File([bytes], 'small.bin')
+    const abSpy = vi.spyOn(file, 'arrayBuffer')
+    const streamSpy = vi.spyOn(file, 'stream')
+    const h = await calculateFileChecksum(file, 64) // size 32 < cap 64
+    expect(h).toMatch(/^[0-9a-f]+$/)
+    expect(abSpy).toHaveBeenCalledTimes(1)
+    expect(streamSpy).not.toHaveBeenCalled()
+  })
+
+  test('file above threshold returns null and performs NO I/O on the file', async () => {
     const bytes = new Uint8Array(128)
     for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 7) & 0xff
     const file = new File([bytes], 'big.bin')
     const abSpy = vi.spyOn(file, 'arrayBuffer')
     const streamSpy = vi.spyOn(file, 'stream')
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
     const h = await calculateFileChecksum(file, 16) // size 128 > cap 16
-    expect(h).toMatch(/^[0-9a-f]+$/)
+    expect(h).toBeNull()
     expect(abSpy).not.toHaveBeenCalled()
-    expect(streamSpy).toHaveBeenCalledTimes(1)
+    expect(streamSpy).not.toHaveBeenCalled()
+    expect(infoSpy).toHaveBeenCalledTimes(1)
+    expect(String(infoSpy.mock.calls[0]?.[0] ?? '')).toMatch(/checksumMaxSize/)
+    infoSpy.mockRestore()
   })
 
-  test('streaming produces the same hash as non-streaming for identical content', async () => {
-    const bytes = new Uint8Array(256)
-    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 31 + 5) & 0xff
-    const a = new File([bytes], 'a.bin')
-    const b = new File([bytes], 'b.bin')
-    const hNonStreaming = await calculateFileChecksum(a, 1024) // size 256 < cap 1024
-    const hStreaming = await calculateFileChecksum(b, 16) // size 256 > cap 16
-    expect(hStreaming).toBe(hNonStreaming)
+  test('repeated above-cap calls only emit the console.info notice once', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    for (let i = 0; i < 5; i++) {
+      const file = new File([new Uint8Array(64)], `big-${i}.bin`)
+      const h = await calculateFileChecksum(file, 8)
+      expect(h).toBeNull()
+    }
+    expect(infoSpy).toHaveBeenCalledTimes(1)
+    infoSpy.mockRestore()
   })
 
-  test('maxSize of 0 or null falls back to default cap (no streaming for tiny files)', async () => {
+  test('maxSize of 0 or null falls back to default cap (no skip for tiny files)', async () => {
     const file = new File([new Uint8Array([1, 2, 3])], 'tiny.bin')
     const streamSpy = vi.spyOn(file, 'stream')
     const h = await calculateFileChecksum(file, 0)
