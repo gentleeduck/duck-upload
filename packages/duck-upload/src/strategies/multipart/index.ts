@@ -9,6 +9,130 @@ import { sleep } from '../../core/utils/async'
 
 const DEFAULT_MAX_PART_CONCURRENCY = 4
 
+/**
+ * Configuration for {@link multipartStrategy}.
+ *
+ * Security note: the per-part URL returned by `signPart` is fed straight to
+ * the transport. A compromised backend or MITM can return a `file://`,
+ * `javascript:`, or private-network URL. Configure {@link allowedHosts}
+ * (preferred) or leave {@link allowPrivateHosts} at its default `false` to
+ * block loopback/private addresses.
+ */
+export type MultipartStrategyConfig = {
+  maxPartConcurrency?: number
+  /**
+   * Optional case-insensitive allow-list of host names (with optional port,
+   * e.g. `upload.example.com:8443`). When set, every signed part URL must
+   * match a listed host or it is rejected.
+   */
+  allowedHosts?: string[]
+  /**
+   * When `true`, allow private-network IP literals (loopback, RFC1918,
+   * link-local, etc.) in signed part URLs. Defaults to `false`.
+   */
+  allowPrivateHosts?: boolean
+}
+
+export namespace MultipartStrategy {
+  export type IConfig = MultipartStrategyConfig
+}
+
+let warnedMissingAllowedHosts = false
+
+/**
+ * Reset internal warn-once latches. Test-only.
+ *
+ * @internal
+ */
+export function __resetMultipartWarningsForTests(): void {
+  warnedMissingAllowedHosts = false
+}
+
+/**
+ * Reject hosts that resolve (literally) to a private/loopback/link-local
+ * address. We only block IP literals — DNS rebinding is out of scope for a
+ * client-side check.
+ */
+function isPrivateHost(host: string): boolean {
+  // IPv6 — strip surrounding brackets if present
+  const v6 = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host
+  if (v6.includes(':')) {
+    const lc = v6.toLowerCase()
+    if (lc === '::1' || lc === '::' || lc === '0:0:0:0:0:0:0:1' || lc === '0:0:0:0:0:0:0:0') return true
+    // fc00::/7
+    if (/^f[cd][0-9a-f]{0,2}:/.test(lc)) return true
+    // fe80::/10
+    if (/^fe[89ab][0-9a-f]?:/.test(lc)) return true
+    return false
+  }
+
+  // IPv4
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
+  if (!m) return false
+  const a = Number(m[1])
+  const b = Number(m[2])
+  if (a === 127) return true // 127.0.0.0/8
+  if (a === 10) return true // 10.0.0.0/8
+  if (a === 172 && b >= 16 && b <= 31) return true // 172.16.0.0/12
+  if (a === 192 && b === 168) return true // 192.168.0.0/16
+  if (a === 0) return true // 0.0.0.0/8
+  return false
+}
+
+/**
+ * Validate the per-part URL returned by `signPart` before it is handed to the
+ * transport. Throws on rejection. Exposed for tests; not part of the public
+ * API surface.
+ *
+ * @internal
+ */
+export function validatePartUrl(
+  rawUrl: string,
+  opts: { allowedHosts?: string[]; allowPrivateHosts?: boolean } = {},
+): void {
+  if (typeof rawUrl !== 'string' || rawUrl.length === 0) {
+    throw new Error('multipart.signPart returned an invalid URL (empty or non-string)')
+  }
+
+  // Reject path-traversal segments in the raw input. `new URL` normalizes them
+  // away, so check before parsing.
+  if (rawUrl.includes('..')) {
+    throw new Error('multipart.signPart URL contains forbidden ".." segment')
+  }
+
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    throw new Error('multipart.signPart returned a malformed URL')
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`multipart.signPart URL has forbidden protocol "${parsed.protocol}"`)
+  }
+
+  if (opts.allowedHosts && opts.allowedHosts.length > 0) {
+    const host = parsed.host.toLowerCase()
+    const list = opts.allowedHosts.map((h) => h.toLowerCase())
+    if (!list.includes(host)) {
+      throw new Error('multipart.signPart URL host is not in the configured allow-list')
+    }
+  } else if (!warnedMissingAllowedHosts) {
+    warnedMissingAllowedHosts = true
+    console.warn(
+      '[duck-upload] multipartStrategy: no `allowedHosts` configured. Signed part URLs will be host-unrestricted. ' +
+        'Set MultipartStrategy.IConfig.allowedHosts to lock the upload host.',
+    )
+  }
+
+  if (!opts.allowPrivateHosts) {
+    // Hostname strips an IPv6 bracket already; pass raw host so we can detect bracketed v6 forms too.
+    if (isPrivateHost(parsed.hostname)) {
+      throw new Error('multipart.signPart URL points to a private/loopback host')
+    }
+  }
+}
+
 export type MultipartIntent = {
   strategy: 'multipart'
   fileId: string
@@ -47,8 +171,10 @@ export function multipartStrategy<
   C extends CursorMap<M> & { multipart?: MultipartCursor },
   P extends string = string,
   R extends UploadResultBase = UploadResultBase,
->(opts?: { maxPartConcurrency?: number }): UploadStrategy<M, C, P, R, 'multipart'> {
+>(opts?: MultipartStrategyConfig): UploadStrategy<M, C, P, R, 'multipart'> {
   const maxPartConcurrency = Math.max(1, opts?.maxPartConcurrency ?? DEFAULT_MAX_PART_CONCURRENCY)
+  const allowedHosts = opts?.allowedHosts
+  const allowPrivateHosts = opts?.allowPrivateHosts === true
 
   return {
     id: 'multipart',
@@ -128,6 +254,11 @@ export function multipartStrategy<
           const size = blob.size
 
           const signed = await getSignedPart(p.partNumber)
+
+          // SEC-001: validate the per-part URL before handing it to the
+          // transport. A compromised backend can otherwise pivot the browser
+          // to `file://`, `javascript:`, or a private-network host.
+          validatePartUrl(signed.url, { allowedHosts, allowPrivateHosts })
 
           const res = await ctx.transport.put({
             url: signed.url,
