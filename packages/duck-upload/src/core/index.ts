@@ -1,5 +1,6 @@
 export * from './client'
 export * from './contracts'
 export * from './engine'
+export * from './errors'
 export * from './persistence'
 export * from './utils'
