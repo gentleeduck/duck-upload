@@ -19,7 +19,7 @@
   "license": "MIT",
   "main": "index.ts",
   "name": "@gentleduck/vitest-config",
-  "homepage": "https://github.com/gentleeduck/duck-upload/tree/master/tooling/vitest#readme",
+  "homepage": "https://gentleduck.org/duck-upload",
   "bugs": {
     "url": "https://github.com/gentleeduck/duck-upload/issues"
   },
