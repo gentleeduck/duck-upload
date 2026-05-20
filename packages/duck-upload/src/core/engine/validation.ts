@@ -214,3 +214,7 @@ export function validateIntent(intent: unknown, strategy: string, fileSize?: num
 
   return null
 }
+
+// SEC-004: re-export the async magic-byte MIME validator so callers
+// that import from this barrel see it alongside the sync validators.
+export { validateMimeSignature } from './validation/mime'
