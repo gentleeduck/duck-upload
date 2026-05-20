@@ -8,6 +8,8 @@ export type RejectReason =
   | { code: 'file_too_large'; maxBytes: number; size: number }
   | { code: 'type_not_allowed'; allowed: string[]; got: string }
   | { code: 'too_many_files'; max: number }
+  | { code: 'mime_mismatch'; claimed: string; sniffed: string }
+  | { code: 'filename_rejected'; reason: 'reserved' | 'too-long' | 'empty' | 'path-sep' }
 
 /**
  * Base interface for custom errors.
