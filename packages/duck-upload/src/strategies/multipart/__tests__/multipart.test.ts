@@ -98,10 +98,7 @@ describe('multipartStrategy — happy path', () => {
     vi.restoreAllMocks()
   })
 
-  function makeCtx(opts: {
-    signPartUrl: string
-    fileSize?: number
-  }) {
+  function makeCtx(opts: { signPartUrl: string; fileSize?: number }) {
     const size = opts.fileSize ?? 8
     const file = new File([new Uint8Array(size)], 'a.bin')
     const transport: Pick<UploadTransport, 'put' | 'postForm' | 'patch'> = {
