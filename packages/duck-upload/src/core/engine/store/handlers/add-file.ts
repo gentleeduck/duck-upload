@@ -1,6 +1,6 @@
 import type { CursorMap, FileFingerprint, IntentMap, UploadResultBase } from '../../../contracts'
 import { generateId } from '../../../utils/id'
-import { validateFile, validateFileList } from '../../validation'
+import { validateFile, validateFileList, validateMimeSignature } from '../../validation'
 import { calculateFileChecksum, computeFingerprint } from '../store.libs'
 import type { StoreRuntime } from '../store.types'
 
@@ -36,9 +36,16 @@ export function handleAddFiles<
     rt.enqueueEffect(async () => {
       let checksum: string | undefined
       try {
-        checksum = await calculateFileChecksum(file, rt.opts.config.checksumMaxSize)
-        const updatedFingerprint = { ...fingerprint, checksum }
-        rt.applyInternal({ type: 'fingerprint.updated', localId, fingerprint: updatedFingerprint })
+        // `calculateFileChecksum` returns `null` when the file exceeds
+        // `checksumMaxSize` (SEC-007/018: skip > stream). Treat that as
+        // "no checksum available" — same path as a thrown failure but
+        // without the warn.
+        const computed = await calculateFileChecksum(file, rt.opts.config.checksumMaxSize)
+        if (computed !== null) {
+          checksum = computed
+          const updatedFingerprint = { ...fingerprint, checksum }
+          rt.applyInternal({ type: 'fingerprint.updated', localId, fingerprint: updatedFingerprint })
+        }
       } catch (err) {
         // Checksum failure is non-fatal — continue without dedupe.
         if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -76,6 +83,21 @@ export function handleAddFiles<
       if (cfgReason) {
         rt.applyInternal({ type: 'validation.failed', localId, reason: cfgReason })
         return
+      }
+
+      // SEC-004: magic-byte MIME sniff. In strict mode a mismatch rejects
+      // the file; otherwise a one-time-per-pair `console.warn` is emitted.
+      try {
+        const mimeReason = await validateMimeSignature(file, rt.opts.config.strictMimeMatch)
+        if (mimeReason) {
+          rt.applyInternal({ type: 'validation.failed', localId, reason: mimeReason })
+          return
+        }
+      } catch (err) {
+        // Sniff failure is non-fatal — fall through.
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+          console.warn('[UploadEngine] MIME sniff failed:', err)
+        }
       }
 
       rt.applyInternal({ type: 'validation.ok', localId })
