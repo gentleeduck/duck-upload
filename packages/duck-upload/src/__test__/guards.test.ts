@@ -21,10 +21,22 @@ describe('isRecord', () => {
     expect(isRecord(true)).toBe(false)
   })
 
-  // NOTE: the current implementation treats arrays as records (typeof === 'object').
-  // Documented limitation: isRecord does not narrow out arrays.
-  test('arrays are treated as records by the current implementation', () => {
-    expect(isRecord([])).toBe(true)
-    expect(isRecord([1, 2, 3])).toBe(true)
+  // SEC-002: isRecord now rejects arrays and other non-plain objects so that
+  // hydrate paths cannot spread foreign shapes into runtime state.
+  test('arrays are rejected', () => {
+    expect(isRecord([])).toBe(false)
+    expect(isRecord([1, 2, 3])).toBe(false)
+  })
+
+  test('exotic objects are rejected', () => {
+    expect(isRecord(new Date())).toBe(false)
+    expect(isRecord(new Map())).toBe(false)
+    expect(isRecord(new Set())).toBe(false)
+    class Foo {}
+    expect(isRecord(new Foo())).toBe(false)
+  })
+
+  test('null-prototype objects are accepted', () => {
+    expect(isRecord(Object.create(null))).toBe(true)
   })
 })

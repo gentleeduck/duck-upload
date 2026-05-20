@@ -1,3 +1,4 @@
+import { stripDangerousKeys } from '../utils/guards'
 import type { PersistenceAdapter } from './persistence.types'
 
 const DB_NAME = 'upload-engine'
@@ -43,7 +44,9 @@ export const IndexedDBAdapter: PersistenceAdapter = {
     try {
       const value = await reqToPromise(store.get(key))
       await txDone(tx)
-      return value ?? null
+      // SEC-002: defend the hydrate path from prototype-pollution payloads
+      // smuggled in via same-origin scripts or compromised browser storage.
+      return value === undefined || value === null ? null : stripDangerousKeys(value)
     } catch {
       try {
         await txDone(tx)
