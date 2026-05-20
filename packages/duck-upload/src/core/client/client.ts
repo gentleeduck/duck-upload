@@ -46,5 +46,6 @@ export function resolveUploadConfig<P extends string>(input?: Client.UploadConfi
           ? null
           : Math.max(1, input.checksumChunkBytes),
     strictRebindType: input?.strictRebindType ?? false,
+    strictMimeMatch: input?.strictMimeMatch ?? false,
   }
 }

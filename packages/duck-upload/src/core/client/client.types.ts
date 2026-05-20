@@ -91,6 +91,16 @@ export namespace Client {
      * same browser/runtime.
      */
     strictRebindType: boolean
+    /**
+     * SEC-004: cross-check `file.type` against the file's magic bytes.
+     * When `true`, files whose sniffed signature disagrees with the
+     * client-claimed `file.type` are rejected with a `validation_failed`
+     * reason. When `false` (default), only a one-time `console.warn`
+     * notice is emitted per mismatched format. Unknown signatures are
+     * always allowed through — this is defense-in-depth, not a deny-
+     * list.
+     */
+    strictMimeMatch: boolean
   }
 
   /**
