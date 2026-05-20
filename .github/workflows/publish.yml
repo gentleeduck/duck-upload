@@ -30,11 +30,12 @@ env:
   NEXT_PUBLIC_APP_URL: https://gentleduck.org/duck-upload
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+  HUSKY: "0"
 
 jobs:
   release-pr:
     name: Open / refresh version PR
-    if: ${{ github.event.head_commit.message != 'chore: version packages' }}
+    if: "!startsWith(github.event.head_commit.message, 'chore: version packages')"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
@@ -72,7 +73,7 @@ jobs:
             turbo-${{ runner.os }}-
 
       - name: Install Dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Build
         run: bunx turbo run build --filter='./packages/*'
@@ -88,7 +89,7 @@ jobs:
 
   publish:
     name: Publish to npm
-    if: ${{ github.event.head_commit.message == 'chore: version packages' || github.event_name == 'workflow_dispatch' }}
+    if: "startsWith(github.event.head_commit.message, 'chore: version packages') || github.event_name == 'workflow_dispatch'"
     runs-on: ubuntu-latest
     environment: npm
     steps:
@@ -127,7 +128,7 @@ jobs:
             turbo-${{ runner.os }}-
 
       - name: Install Dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Build
         run: bunx turbo run build --filter='./packages/*'
