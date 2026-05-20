@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { resolveUploadConfig } from '../core/client'
 import {
   calculateFileChecksum,
@@ -134,5 +134,48 @@ describe('calculateFileChecksum', () => {
     const ha = await calculateFileChecksum(a)
     const hb = await calculateFileChecksum(b)
     expect(ha).not.toBe(hb)
+  })
+
+  // SEC-007: honor `checksumMaxSize` by streaming above the cap.
+  test('file at the threshold uses arrayBuffer() (non-streaming path)', async () => {
+    const bytes = new Uint8Array(64)
+    for (let i = 0; i < bytes.length; i++) bytes[i] = i
+    const file = new File([bytes], 'cap.bin')
+    const abSpy = vi.spyOn(file, 'arrayBuffer')
+    const streamSpy = vi.spyOn(file, 'stream')
+    const h = await calculateFileChecksum(file, 64) // size 64, cap 64 -> NOT above
+    expect(h).toMatch(/^[0-9a-f]+$/)
+    expect(abSpy).toHaveBeenCalledTimes(1)
+    expect(streamSpy).not.toHaveBeenCalled()
+  })
+
+  test('file above threshold uses streaming and never calls arrayBuffer()', async () => {
+    const bytes = new Uint8Array(128)
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 7) & 0xff
+    const file = new File([bytes], 'big.bin')
+    const abSpy = vi.spyOn(file, 'arrayBuffer')
+    const streamSpy = vi.spyOn(file, 'stream')
+    const h = await calculateFileChecksum(file, 16) // size 128 > cap 16
+    expect(h).toMatch(/^[0-9a-f]+$/)
+    expect(abSpy).not.toHaveBeenCalled()
+    expect(streamSpy).toHaveBeenCalledTimes(1)
+  })
+
+  test('streaming produces the same hash as non-streaming for identical content', async () => {
+    const bytes = new Uint8Array(256)
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 31 + 5) & 0xff
+    const a = new File([bytes], 'a.bin')
+    const b = new File([bytes], 'b.bin')
+    const hNonStreaming = await calculateFileChecksum(a, 1024) // size 256 < cap 1024
+    const hStreaming = await calculateFileChecksum(b, 16) // size 256 > cap 16
+    expect(hStreaming).toBe(hNonStreaming)
+  })
+
+  test('maxSize of 0 or null falls back to default cap (no streaming for tiny files)', async () => {
+    const file = new File([new Uint8Array([1, 2, 3])], 'tiny.bin')
+    const streamSpy = vi.spyOn(file, 'stream')
+    const h = await calculateFileChecksum(file, 0)
+    expect(h).toMatch(/^[0-9a-f]+$/)
+    expect(streamSpy).not.toHaveBeenCalled()
   })
 })

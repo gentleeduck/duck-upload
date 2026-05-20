@@ -36,7 +36,7 @@ export function handleAddFiles<
     rt.enqueueEffect(async () => {
       let checksum: string | undefined
       try {
-        checksum = await calculateFileChecksum(file)
+        checksum = await calculateFileChecksum(file, rt.opts.config.checksumMaxSize)
         const updatedFingerprint = { ...fingerprint, checksum }
         rt.applyInternal({ type: 'fingerprint.updated', localId, fingerprint: updatedFingerprint })
       } catch (err) {
