@@ -1,4 +1,5 @@
 import type { AnyIntent, CursorMap, IntentMap, UploadError, UploadResultBase } from '../../../contracts'
+import { sanitizeFilename } from '../../../utils/sanitize-filename'
 import { validateIntent } from '../../validation'
 import { normalizeError, retryDecision, sleep } from '../store.libs'
 import type { StoreRuntime } from '../store.types'
@@ -13,6 +14,23 @@ export async function createIntent<
   if (!item || item.phase !== 'creating_intent') return
   if (rt.inflightIntents.has(localId)) return
 
+  // SEC-005: sanitise the filename before it leaves the engine. The
+  // raw `file.name` may contain control chars, RTL overrides, reserved
+  // Windows names, etc. — see `sanitizeFilename` for the full pipeline.
+  const sanitised = sanitizeFilename(item.file.name)
+  if (!sanitised.safe) {
+    const error: UploadError = {
+      code: 'validation_failed',
+      message: 'filename rejected',
+      reason: { code: 'filename_rejected', reason: sanitised.reason },
+      retryable: false,
+      // Tainted original lives only on `context` (SEC-003 contract).
+      context: { original: item.file.name, reason: sanitised.reason },
+    } as UploadError
+    rt.applyInternal({ type: 'intent.failed', localId, error, retryable: false })
+    return
+  }
+
   const controller = new AbortController()
   rt.inflightIntents.set(localId, controller)
 
@@ -22,7 +40,7 @@ export async function createIntent<
         purpose: item.purpose,
         contentType: item.file.type || 'application/octet-stream',
         size: item.file.size,
-        filename: item.file.name,
+        filename: sanitised.normalised,
         checksum: item.fingerprint.checksum,
       },
       { signal: controller.signal },
