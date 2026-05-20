@@ -34,12 +34,17 @@ export async function finalizeUpload<
     const error = normalizeError(err, rt.opts.errorNormalizer)
 
     const itemForContext = rt.state.items.get(localId)
+    // SEC-003: do not interpolate the attacker-controlled filename / fileId
+    // into the `message`. Surface them via the structured `context` field;
+    // consumers MUST escape `context.*` before HTML rendering.
     const errorWithContext: UploadError = itemForContext
       ? {
           ...error,
-          message: `${error.message} (file: ${itemForContext.fingerprint.name}, fileId: ${
-            (hasIntent(itemForContext) && itemForContext.intent?.fileId) ?? 'unknown'
-          })`,
+          context: {
+            ...((error as { context?: Record<string, unknown> }).context ?? {}),
+            filename: itemForContext.fingerprint.name,
+            fileId: (hasIntent(itemForContext) && itemForContext.intent?.fileId) ?? 'unknown',
+          },
         }
       : error
 

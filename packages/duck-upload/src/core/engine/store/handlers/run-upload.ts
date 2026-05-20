@@ -171,12 +171,17 @@ export async function runUpload<
 
     const error = normalizeError(err, rt.opts.errorNormalizer)
     const itemForContext = rt.state.items.get(localId)
+    // SEC-003: filename and other tainted strings go on `context`, never the
+    // `message`. Consumers MUST escape `context.*` before HTML rendering.
     const errorWithContext: UploadError = itemForContext
       ? {
           ...error,
-          message: `${error.message} (file: ${itemForContext.fingerprint.name}, size: ${
-            (hasFile(itemForContext) && itemForContext.file?.size) ?? 0
-          } bytes, phase: ${itemForContext.phase})`,
+          context: {
+            ...((error as { context?: Record<string, unknown> }).context ?? {}),
+            filename: itemForContext.fingerprint.name,
+            size: (hasFile(itemForContext) && itemForContext.file?.size) ?? 0,
+            phase: itemForContext.phase,
+          },
         }
       : error
     const decision = retryDecision(rt.opts.config, { phase: 'upload', attempt: 1, error: errorWithContext })

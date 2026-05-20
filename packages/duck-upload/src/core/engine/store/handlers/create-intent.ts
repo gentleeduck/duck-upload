@@ -57,9 +57,17 @@ export async function createIntent<
     }
 
     const error = normalizeError(err, rt.opts.errorNormalizer)
+    // SEC-003: do NOT interpolate the attacker-controlled filename into the
+    // human-readable `message`. Place it on a structured `context` field;
+    // consumers MUST escape `context.*` before any HTML rendering.
     const errorWithContext: UploadError = {
       ...error,
-      message: `${error.message} (file: ${item.fingerprint.name}, size: ${item.file.size} bytes, purpose: ${item.purpose})`,
+      context: {
+        ...((error as { context?: Record<string, unknown> }).context ?? {}),
+        filename: item.fingerprint.name,
+        size: item.file.size,
+        purpose: item.purpose,
+      },
     }
 
     const decision = retryDecision(rt.opts.config, { phase: 'intent', attempt: item.attempt, error: errorWithContext })
