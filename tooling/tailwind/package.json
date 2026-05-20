@@ -11,7 +11,7 @@
   "author": "@gentleduck contributors",
   "license": "MIT",
   "name": "@gentleduck/tailwind-config",
-  "homepage": "https://github.com/gentleeduck/duck-upload/tree/master/tooling/tailwind#readme",
+  "homepage": "https://gentleduck.org/duck-upload",
   "bugs": {
     "url": "https://github.com/gentleeduck/duck-upload/issues"
   },

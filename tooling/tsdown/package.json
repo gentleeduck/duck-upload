@@ -18,7 +18,7 @@
   "license": "MIT",
   "main": "dist/index.mjs",
   "name": "@gentleduck/tsdown-config",
-  "homepage": "https://github.com/gentleeduck/duck-upload/tree/master/tooling/tsdown#readme",
+  "homepage": "https://gentleduck.org/duck-upload",
   "bugs": {
     "url": "https://github.com/gentleeduck/duck-upload/issues"
   },
