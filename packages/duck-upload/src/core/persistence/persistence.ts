@@ -133,10 +133,14 @@ export function deserializeSnapshot<
   return { items }
 }
 
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v)
+}
+
 function isPersistedSnapshot(value: unknown): value is PersistedSnapshot<unknown, unknown, string> {
   if (!isRecord(value)) return false
-  if (typeof value.version !== 'number') return false
-  if (typeof value.createdAt !== 'number') return false
+  if (!isFiniteNumber(value.version)) return false
+  if (!isFiniteNumber(value.createdAt)) return false
   return isRecord(value.items)
 }
 
@@ -161,12 +165,12 @@ function parsePersistedItem(value: unknown): {
   if (!isRecord(value.file)) return null
 
   const name = typeof value.file.name === 'string' ? value.file.name : null
-  const size = typeof value.file.size === 'number' ? value.file.size : null
+  const size = isFiniteNumber(value.file.size) && value.file.size >= 0 ? value.file.size : null
   const type = typeof value.file.type === 'string' ? value.file.type : null
-  const lastModified = typeof value.file.lastModified === 'number' ? value.file.lastModified : null
+  const lastModified = isFiniteNumber(value.file.lastModified) ? value.file.lastModified : null
   const checksum = typeof value.file.checksum === 'string' ? value.file.checksum : undefined
 
-  if (!name || size === null || !type || lastModified === null) return null
+  if (!name || size === null || type === null || lastModified === null) return null
 
   const progress = parseProgress(value.progress)
 
@@ -183,8 +187,9 @@ function parsePersistedItem(value: unknown): {
 
 function parseProgress(value: unknown): { uploadedBytes: number; totalBytes: number; pct?: number } | undefined {
   if (!isRecord(value)) return undefined
-  if (typeof value.uploadedBytes !== 'number' || typeof value.totalBytes !== 'number') return undefined
-  const pct = typeof value.pct === 'number' ? value.pct : undefined
+  if (!isFiniteNumber(value.uploadedBytes) || !isFiniteNumber(value.totalBytes)) return undefined
+  if (value.uploadedBytes < 0 || value.totalBytes < 0) return undefined
+  const pct = isFiniteNumber(value.pct) ? value.pct : undefined
   return { uploadedBytes: value.uploadedBytes, totalBytes: value.totalBytes, pct }
 }
 

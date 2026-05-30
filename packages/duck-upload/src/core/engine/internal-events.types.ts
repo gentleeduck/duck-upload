@@ -13,7 +13,7 @@ import type { UploadProgress } from './progress.types'
 
 /**
  * Internal events emitted by effects and consumed by the reducer.
- * Distinct from the public event surface — these drive state transitions.
+ * Distinct from the public event surface - these drive state transitions.
  */
 export type InternalEvent<
   M extends IntentMap,

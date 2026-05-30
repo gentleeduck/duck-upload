@@ -16,17 +16,11 @@ export const DEFAULT_RETRY_DELAY_MAX_MS = 10_000
  */
 export const DEFAULT_PROGRESS_THROTTLE_MS = 100
 
-/**
- * Default maximum number of retry attempts.
- */
+/** Default maximum number of retry attempts. */
 export const DEFAULT_MAX_ATTEMPTS = 3
 
-/**
- * Default maximum number of concurrent uploads.
- */
+/** Default maximum number of concurrent uploads. */
 export const DEFAULT_MAX_CONCURRENT_UPLOADS = 3
 
-/**
- * Default maximum number of items to keep in memory.
- */
+/** Default maximum number of items to keep in memory. */
 export const DEFAULT_MAX_ITEMS = 100

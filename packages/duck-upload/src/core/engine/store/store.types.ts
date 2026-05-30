@@ -72,9 +72,7 @@ export interface UploadStore<
     cb: (payload: UploadEventMap<M, C, P, R>[K]) => void,
   ) => () => void
 
-  /**
-   * Waits for the given localIds to reach a terminal state.
-   */
+  /** Waits for the given localIds to reach a terminal state. */
   waitFor(localIds: string[]): Promise<Array<UploadOutcome<R>>>
 }
 
@@ -170,14 +168,10 @@ export type PersistenceOptions<
    */
   deserialize?: (raw: unknown, ctx: DeserializeContext<M, C, P>) => UploadState<M, C, P, R> | null
 
-  /**
-   * Runtime guard for purpose strings when using the default deserializer.
-   */
+  /** Runtime guard for purpose strings when using the default deserializer. */
   isPurpose?: (value: string) => value is P
 
-  /**
-   * Runtime guard for intent objects when using the default deserializer.
-   */
+  /** Runtime guard for intent objects when using the default deserializer. */
   isIntent?: (value: unknown) => value is M[keyof M]
 }
 

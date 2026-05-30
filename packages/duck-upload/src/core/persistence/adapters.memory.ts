@@ -29,7 +29,7 @@ export function createMemoryAdapter(): PersistenceAdapter {
 }
 
 /**
- * Backwards-compatible singleton — every import shares one `Map`.
+ * Backwards-compatible singleton - every import shares one `Map`.
  *
  * @deprecated Use {@link createMemoryAdapter} instead. The shared
  * singleton leaks snapshot state between engine instances and is

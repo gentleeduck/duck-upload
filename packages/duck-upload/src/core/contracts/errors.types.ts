@@ -52,9 +52,7 @@ export type BuiltInUploadError =
  */
 export type UploadError = BuiltInUploadError | (UploadErrorBase & Record<string, unknown>)
 
-/**
- * Validation rules applied on `addFiles` before an item enters the upload pipeline.
- */
+/** Validation rules applied on `addFiles` before an item enters the upload pipeline. */
 export type UploadValidationRules = {
   /** Maximum number of files allowed. */
   maxFiles?: number

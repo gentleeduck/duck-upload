@@ -10,20 +10,20 @@
  * Each of those sinks has its own rules. This module enforces the
  * *intersection* of the most common dangers, in order:
  *
- *   1. Unicode NFKC normalisation — collapse compatibility forms so
+ *   1. Unicode NFKC normalisation - collapse compatibility forms so
  *      bidi-override + width-spoofing tricks do not bypass deny-lists.
- *   2. Strip control characters (`< 0x20` or `0x7F`) — they break
+ *   2. Strip control characters (`< 0x20` or `0x7F`) - they break
  *      multipart parsers and can be used to smuggle CR/LF into headers.
- *   3. Strip a leading `-` — many CLI tools interpret leading-dash
+ *   3. Strip a leading `-` - many CLI tools interpret leading-dash
  *      arguments as flags (`-rm-rf.txt`).
- *   4. Strip trailing `.` and trailing space — silently dropped by
+ *   4. Strip trailing `.` and trailing space - silently dropped by
  *      Windows; `file.txt ` and `file.txt` would collide on extract.
  *   5. Reject reserved Windows device names (CON, PRN, AUX, NUL,
  *      COM1-COM9, LPT1-LPT9) regardless of extension.
  *   6. Reject names > 255 chars (POSIX/NTFS practical limit).
- *   7. Reject path separators — a filename must never contain `/` or
+ *   7. Reject path separators - a filename must never contain `/` or
  *      `\`. Path-joining belongs on a higher layer.
- *   8. Reject empty results — a name that vanished into sanitisation
+ *   8. Reject empty results - a name that vanished into sanitisation
  *      cannot be safely used.
  */
 
@@ -103,7 +103,7 @@ export function sanitizeFilename(name: string): SanitizeFilenameResult {
     return { safe: false, normalised: n, reason: 'too-long' }
   }
 
-  // 5) Reserved Windows device names — match the *base* (before the
+  // 5) Reserved Windows device names - match the *base* (before the
   //    final dot), case-insensitive. `CON.txt`, `nul`, `COM1.tar.gz`
   //    all reject.
   const dot = n.indexOf('.')

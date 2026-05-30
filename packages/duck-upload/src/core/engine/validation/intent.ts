@@ -1,11 +1,14 @@
 import { isRecord } from '../../utils/guards'
 
+function isFinitePositive(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0
+}
+
 export function validateIntent(intent: unknown, strategy: string): Error | null {
   if (!isRecord(intent)) {
     return new Error('Invalid intent: must be an object')
   }
 
-  // Check required fields
   if (typeof intent.strategy !== 'string') {
     return new Error('Invalid intent: missing or invalid strategy field')
   }
@@ -18,9 +21,7 @@ export function validateIntent(intent: unknown, strategy: string): Error | null 
     return new Error('Invalid intent: missing or invalid fileId')
   }
 
-  // Strategy-specific validation
   if (strategy === 'post') {
-    // POST strategy requires url and fields
     if (typeof intent.url !== 'string' || !intent.url) {
       return new Error('Invalid post intent: missing or invalid url')
     }
@@ -36,14 +37,14 @@ export function validateIntent(intent: unknown, strategy: string): Error | null 
       return new Error('Invalid post intent: missing or invalid fields')
     }
   } else if (strategy === 'multipart') {
-    // Multipart strategy requires uploadId and partSize
     if (typeof intent.uploadId !== 'string' || !intent.uploadId) {
       return new Error('Invalid multipart intent: missing or invalid uploadId')
     }
-    if (typeof intent.partSize !== 'number' || intent.partSize <= 0) {
+    // NaN-bypass defense: typeof NaN === 'number' AND NaN > 0 is false, so the
+    // prior `intent.partSize <= 0` check let NaN through. isFinitePositive rejects it.
+    if (!isFinitePositive(intent.partSize)) {
       return new Error('Invalid multipart intent: missing or invalid partSize')
     }
-    // Parts array is optional (can be fetched later)
     if ('parts' in intent && intent.parts !== undefined) {
       if (!Array.isArray(intent.parts)) {
         return new Error('Invalid multipart intent: parts must be an array if provided')

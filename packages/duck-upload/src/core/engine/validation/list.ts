@@ -38,13 +38,3 @@ export function validateFileList<P extends string>(
 
   return { valid, rejected }
 }
-
-/**
- * Validates an intent object from the backend.
- * Ensures required fields are present and URLs are valid.
- *
- * @param intent - Intent object to validate
- * @param strategy - Expected strategy type (from the intent itself)
- *
- * @returns {Error | null} Error if validation fails, null if valid
- */

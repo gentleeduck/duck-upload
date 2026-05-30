@@ -16,7 +16,7 @@ export async function createIntent<
 
   // SEC-005: sanitise the filename before it leaves the engine. The
   // raw `file.name` may contain control chars, RTL overrides, reserved
-  // Windows names, etc. — see `sanitizeFilename` for the full pipeline.
+  // Windows names, etc. - see `sanitizeFilename` for the full pipeline.
   const sanitised = sanitizeFilename(item.file.name)
   if (!sanitised.safe) {
     const error: UploadError = {
@@ -26,7 +26,7 @@ export async function createIntent<
       retryable: false,
       // Tainted original lives only on `context` (SEC-003 contract).
       context: { original: item.file.name, reason: sanitised.reason },
-    } as UploadError
+    }
     rt.applyInternal({ type: 'intent.failed', localId, error, retryable: false })
     return
   }

@@ -1,11 +1,12 @@
 /**
  * S3/MinIO-style multipart strategy: sign each part on demand via `signPart`,
- * PUT, then finalize with `completeMultipart` using collected ETags. Resumable —
+ * PUT, then finalize with `completeMultipart` using collected ETags. Resumable -
  * persists ETags in the cursor and skips already-completed sessions.
  */
 
 import type { CursorMap, IntentMap, UploadResultBase, UploadStrategy } from '../../core/contracts'
 import { sleep } from '../../core/utils/async'
+import { validateUploadUrl } from '../../core/utils/url-safety'
 
 const DEFAULT_MAX_PART_CONCURRENCY = 4
 
@@ -49,132 +50,6 @@ export function __resetMultipartWarningsForTests(): void {
 }
 
 /**
- * Converts a 32-bit IPv4 tail expressed as two colon-separated hex groups
- * (e.g. `7f00:1`) into dotted-quad form (`127.0.0.1`). Returns `null` if the
- * input is not a well-formed 32-bit hex tail. Both groups may be 1–4 hex
- * digits; the second group may be omitted leading zeros (`7f00:1` ==
- * `7f00:0001`).
- *
- * Ported verbatim from duck-iam (proven against rescans 003/004/006).
- */
-function hexTailToDottedQuad(tail: string): string | null {
-  const m = /^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(tail)
-  if (!m) return null
-  const hi = parseInt(m[1]!, 16)
-  const lo = parseInt(m[2]!, 16)
-  if (!Number.isFinite(hi) || !Number.isFinite(lo)) return null
-  if (hi < 0 || hi > 0xffff || lo < 0 || lo > 0xffff) return null
-  return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`
-}
-
-/**
- * Reject hosts that resolve (literally) to a private/loopback/link-local/
- * cloud-metadata/CGNAT/multicast/broadcast address. We only block IP literals
- * — DNS rebinding is out of scope for a client-side check.
- *
- * Ported from duck-iam's `_isPrivateHost` (proven across rescans 003/004/006).
- * Covers:
- * - IPv4: 127/8, 10/8, 172.16/12, 192.168/16, 169.254/16 (link-local +
- *   AWS metadata 169.254.169.254), 0/8 (this-network), 100.64/10 (CGNAT),
- *   224/4 (multicast), 240/4 (reserved), 255.255.255.255 (broadcast).
- * - IPv6: ::1, ::, fc00::/7, fe80::/10, ff00::/8 (multicast).
- * - Embedded IPv4: IPv4-mapped (`::ffff:a.b.c.d`, hex form `::ffff:7f00:1`,
- *   fully expanded `0:0:0:0:0:ffff:...`), IPv4-compatible (`::a.b.c.d`),
- *   6to4 (`2002:AABB:CCDD::`), NAT64 (`64:ff9b::v4`) — all decoded and
- *   recursed against the IPv4 list.
- * - Strips a single trailing FQDN dot before checks.
- */
-function isPrivateHost(host: string): boolean {
-  // Strip surrounding brackets from IPv6 literals. Also strip a single
-  // trailing FQDN dot so `127.0.0.1.` normalises to `127.0.0.1`.
-  let h = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host
-  if (h.endsWith('.')) h = h.slice(0, -1)
-
-  // IPv4 dotted-quad
-  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h)
-  if (v4) {
-    const a = Number(v4[1])
-    const b = Number(v4[2])
-    const c = Number(v4[3])
-    const d = Number(v4[4])
-    if (a > 255 || b > 255 || c > 255 || d > 255) return false
-    if (a === 127) return true // 127.0.0.0/8 loopback
-    if (a === 10) return true // 10.0.0.0/8 RFC1918
-    if (a === 192 && b === 168) return true // 192.168.0.0/16 RFC1918
-    if (a === 172 && b >= 16 && b <= 31) return true // 172.16.0.0/12 RFC1918
-    if (a === 169 && b === 254) return true // 169.254.0.0/16 link-local (AWS metadata 169.254.169.254)
-    if (a === 0) return true // 0.0.0.0/8 this-network (incl. unspecified)
-    if (a === 100 && b >= 64 && b <= 127) return true // 100.64.0.0/10 CGNAT
-    if (a >= 224 && a <= 239) return true // 224.0.0.0/4 multicast
-    if (a >= 240) return true // 240.0.0.0/4 reserved + 255.255.255.255 broadcast
-    return false
-  }
-
-  // IPv6 literal
-  if (h.includes(':')) {
-    const lower = h.toLowerCase()
-    if (lower === '::1' || lower === '0:0:0:0:0:0:0:1') return true
-    if (lower === '::' || lower === '0:0:0:0:0:0:0:0') return true
-    // fc00::/7 — first byte 0xfc or 0xfd
-    if (/^f[cd][0-9a-f]{0,2}:/.test(lower)) return true
-    // fe80::/10 — fe8x, fe9x, feax, febx
-    if (/^fe[89ab][0-9a-f]?:/.test(lower)) return true
-    // ff00::/8 — IPv6 multicast (mirrors IPv4 224/4 coverage)
-    if (/^ff[0-9a-f]{0,2}:/.test(lower)) return true
-
-    // IPv4-mapped IPv6 — `::ffff:a.b.c.d` (dotted-quad tail) or
-    // `::ffff:hhhh:hhhh` (hex tail, canonical form Node's URL parser emits).
-    // Also accept the fully expanded `0:0:0:0:0:ffff:...` form.
-    let mappedTail: string | null = null
-    if (lower.startsWith('::ffff:')) mappedTail = lower.slice(7)
-    else if (lower.startsWith('0:0:0:0:0:ffff:')) mappedTail = lower.slice(15)
-    if (mappedTail !== null) {
-      if (mappedTail.includes('.')) return isPrivateHost(mappedTail)
-      const dotted = hexTailToDottedQuad(mappedTail)
-      if (dotted) return isPrivateHost(dotted)
-      return false
-    }
-
-    // IPv4-compatible IPv6 (deprecated RFC4291 §2.5.5.1) — `::a.b.c.d`.
-    if (lower.startsWith('::') && lower.includes('.')) {
-      const tail = lower.slice(2)
-      if (/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(tail)) return isPrivateHost(tail)
-    }
-
-    // 6to4 prefix `2002::/16` carries an inner IPv4 in the next two 16-bit
-    // groups (`2002:AABB:CCDD::` → `A.B.C.D` with bytes AA,BB,CC,DD).
-    // Linux ships 6to4 by default — `2002:7f00:1::` carries `127.0.0.1`.
-    if (lower.startsWith('2002:')) {
-      const m = /^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4})(?::|$)/.exec(lower)
-      if (m) {
-        const dotted = hexTailToDottedQuad(`${m[1]}:${m[2]}`)
-        if (dotted) return isPrivateHost(dotted)
-      }
-    }
-
-    // NAT64 well-known prefix `64:ff9b::/96` carries an inner IPv4 in the
-    // last 32 bits. URL canonicalises leading zeros (`0064:ff9b:` →
-    // `64:ff9b:`); accept both spellings defensively.
-    if (lower.startsWith('64:ff9b:') || lower.startsWith('0064:ff9b:')) {
-      const tail = lower.startsWith('0064:') ? lower.slice(10) : lower.slice(8)
-      if (tail.includes('.')) {
-        const v4match = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(tail)
-        if (v4match) return isPrivateHost(v4match[1]!)
-      }
-      const groups = tail.split(':').filter((g) => g.length > 0)
-      if (groups.length >= 2) {
-        const dotted = hexTailToDottedQuad(`${groups[groups.length - 2]}:${groups[groups.length - 1]}`)
-        if (dotted) return isPrivateHost(dotted)
-      }
-    }
-
-    return false
-  }
-
-  return false
-}
-
-/**
  * Validate the per-part URL returned by `signPart` before it is handed to the
  * transport. Throws on rejection. Exposed for tests; not part of the public
  * API surface.
@@ -185,47 +60,14 @@ export function validatePartUrl(
   rawUrl: string,
   opts: { allowedHosts?: string[]; allowPrivateHosts?: boolean } = {},
 ): void {
-  if (typeof rawUrl !== 'string' || rawUrl.length === 0) {
-    throw new Error('multipart.signPart returned an invalid URL (empty or non-string)')
-  }
-
-  // Reject path-traversal segments in the raw input. `new URL` normalizes them
-  // away, so check before parsing.
-  if (rawUrl.includes('..')) {
-    throw new Error('multipart.signPart URL contains forbidden ".." segment')
-  }
-
-  let parsed: URL
-  try {
-    parsed = new URL(rawUrl)
-  } catch {
-    throw new Error('multipart.signPart returned a malformed URL')
-  }
-
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(`multipart.signPart URL has forbidden protocol "${parsed.protocol}"`)
-  }
-
-  if (opts.allowedHosts && opts.allowedHosts.length > 0) {
-    const host = parsed.host.toLowerCase()
-    const list = opts.allowedHosts.map((h) => h.toLowerCase())
-    if (!list.includes(host)) {
-      throw new Error('multipart.signPart URL host is not in the configured allow-list')
-    }
-  } else if (!warnedMissingAllowedHosts) {
+  if (!opts.allowedHosts && !warnedMissingAllowedHosts) {
     warnedMissingAllowedHosts = true
     console.warn(
       '[duck-upload] multipartStrategy: no `allowedHosts` configured. Signed part URLs will be host-unrestricted. ' +
         'Set MultipartStrategy.IConfig.allowedHosts to lock the upload host.',
     )
   }
-
-  if (!opts.allowPrivateHosts) {
-    // Hostname strips an IPv6 bracket already; pass raw host so we can detect bracketed v6 forms too.
-    if (isPrivateHost(parsed.hostname)) {
-      throw new Error('multipart.signPart URL points to a private/loopback host')
-    }
-  }
+  validateUploadUrl(rawUrl, 'multipart.signPart', opts)
 }
 
 export type MultipartIntent = {
@@ -280,7 +122,7 @@ export function multipartStrategy<
       const totalBytes = ctx.file.size
       const partSize = Math.max(1, intent.partSize)
 
-      // Trust backend `partCount` when provided — S3-style backends enforce a maxParts rule.
+      // Trust backend `partCount` when provided - S3-style backends enforce a maxParts rule.
       const totalParts = Math.max(1, intent.partCount ?? Math.ceil(totalBytes / partSize))
 
       const cursor = ctx.readCursor()

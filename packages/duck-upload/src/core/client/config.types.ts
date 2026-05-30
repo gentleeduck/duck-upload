@@ -60,18 +60,21 @@ export type UploadConfig<P extends string> = {
  */
 export type UploadConfigInput<P extends string> = Partial<UploadConfig<P>>
 
-/**
- * Normalizes user config by applying sensible defaults.
- */
+/** Normalizes user config by applying sensible defaults. */
+function finitePositive(input: number | undefined, fallback: number, min = 1): number {
+  if (typeof input !== 'number' || !Number.isFinite(input)) return fallback
+  return Math.max(min, input)
+}
+
 export function resolveUploadConfig<P extends string>(input?: UploadConfigInput<P>): UploadConfig<P> {
   return {
-    maxConcurrentUploads: Math.max(1, input?.maxConcurrentUploads ?? DEFAULT_MAX_CONCURRENT_UPLOADS),
+    maxConcurrentUploads: finitePositive(input?.maxConcurrentUploads, DEFAULT_MAX_CONCURRENT_UPLOADS),
     autoStart: input?.autoStart,
-    progressThrottleMs: Math.max(0, input?.progressThrottleMs ?? DEFAULT_PROGRESS_THROTTLE_MS),
+    progressThrottleMs: finitePositive(input?.progressThrottleMs, DEFAULT_PROGRESS_THROTTLE_MS, 0),
     validation: input?.validation ?? {},
-    maxAttempts: Math.max(1, input?.maxAttempts ?? DEFAULT_MAX_ATTEMPTS),
+    maxAttempts: finitePositive(input?.maxAttempts, DEFAULT_MAX_ATTEMPTS),
     retryPolicy: input?.retryPolicy,
-    maxItems: Math.max(1, input?.maxItems ?? DEFAULT_MAX_ITEMS),
+    maxItems: finitePositive(input?.maxItems, DEFAULT_MAX_ITEMS),
     completedItemTTL: input?.completedItemTTL,
   }
 }

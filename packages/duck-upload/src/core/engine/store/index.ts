@@ -4,25 +4,11 @@ import { dispatch as internalDispatch } from './store.dispatch'
 import { createStoreRuntime } from './store.runtime'
 import type { StoreOptions, StoreRuntime, UploadStore } from './store.types'
 
-// TODO: add option for debug mode
-
 /**
- * Creates an upload store instance.
- *
- * This is the main runtime object you interact with from the outside:
- * - dispatch user commands (add files, start, pause, cancel, resume)
- * - subscribe to state changes (for UI rendering)
- * - subscribe to typed events (for progress, errors, and lifecycle)
- *
- * Plugins are initialized once during construction and receive a minimal store
- * proxy (events, dispatch, snapshot access) to avoid tight coupling.
- *
- * @template M - Intent map type (keyed by strategy id)
- * @template C - Cursor map type (keyed by strategy id)
- * @template P - Purpose string union type
- *
- * @param opts - Store options (config, backend API, strategies, transport, hooks)
- * @returns A configured {@link UploadStore} instance.
+ * The runtime object: dispatch commands, subscribe to state changes,
+ * subscribe to typed events. Plugins are initialized once during
+ * construction with a minimal proxy (events / dispatch / snapshot) so
+ * they cannot reach into store internals.
  */
 export function createUploadStore<
   M extends IntentMap,
