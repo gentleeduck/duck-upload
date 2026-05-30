@@ -8,9 +8,7 @@
  * - Header parsing (ETag extraction)
  */
 export interface UploadTransport {
-  /**
-   * Performs an HTTP PUT request (typically for S3 signed URLs).
-   */
+  /** Performs an HTTP PUT request (typically for S3 signed URLs). */
   put(args: {
     url: string
     body: Blob
@@ -19,9 +17,7 @@ export interface UploadTransport {
     onProgress?: (u: number, t: number) => void
   }): Promise<{ etag?: string; headers?: Record<string, string> }>
 
-  /**
-   * Performs an HTTP POST multipart request.
-   */
+  /** Performs an HTTP POST multipart request. */
   postForm(args: {
     url: string
     fields: Record<string, string>
@@ -31,9 +27,7 @@ export interface UploadTransport {
     onProgress?: (uploadedBytes: number, totalBytes: number) => void
   }): Promise<{ etag?: string; headers?: Record<string, string> }>
 
-  /**
-   * Performs an HTTP request.
-   */
+  /** Performs an HTTP request. */
   patch(args: {
     url: string
     body: Blob | ArrayBuffer

@@ -17,7 +17,7 @@ import { __mimeWarnings, mimeMatches, sniffMime } from '../../utils/mime-sniff'
  */
 export async function validateMimeSignature(file: File, strict: boolean): Promise<RejectReason | null> {
   if (file.size === 0) return null
-  // 16 bytes is enough — every signature we recognise fits in 12.
+  // 16 bytes is enough - every signature we recognise fits in 12.
   const head = await file.slice(0, 16).arrayBuffer()
   const sniffed = sniffMime(new Uint8Array(head))
   if (sniffed === null) return null
@@ -31,7 +31,7 @@ export async function validateMimeSignature(file: File, strict: boolean): Promis
   const key = `${claimed || '<empty>'}::${sniffed}`
   if (!__mimeWarnings.has(key)) {
     __mimeWarnings.add(key)
-    // Note: filename intentionally NOT included (SEC-003 — tainted input).
+    // Note: filename intentionally NOT included (SEC-003 - tainted input).
     console.warn(
       `[duck-upload] MIME mismatch: claimed "${claimed || '<empty>'}" but bytes look like "${sniffed}". ` +
         'Set `strictMimeMatch: true` to reject these files.',

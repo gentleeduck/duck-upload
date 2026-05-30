@@ -2,13 +2,13 @@
  * Magic-byte MIME sniffer.
  *
  * SEC-004: `File.type` is client-claimed and trivially spoofable (the
- * browser populates it from extension or the user-side drag source — a
+ * browser populates it from extension or the user-side drag source - a
  * server cannot trust it). This module inspects the first ~12 bytes of a
  * file and returns the actual format, so the validator can cross-check
  * the claimed `file.type` against the byte signature.
  *
  * Only common, unambiguous formats are recognised. Returning `null` means
- * "unknown" — callers should treat unknown as *not a mismatch* (defense-in-
+ * "unknown" - callers should treat unknown as *not a mismatch* (defense-in-
  * depth, not a deny-list).
  */
 
@@ -98,7 +98,7 @@ export function sniffMime(bytes: Uint8Array): string | null {
  * they refer to the same format, `false` on conflict. `null` sniff is
  * always treated as a match (unknown formats are not a deny condition).
  *
- * Comparison is loose by design — `image/jpg` vs `image/jpeg`, ZIP-based
+ * Comparison is loose by design - `image/jpg` vs `image/jpeg`, ZIP-based
  * Office formats vs `application/zip`, etc. all need to be tolerated.
  */
 export function mimeMatches(claimed: string, sniffed: string | null): boolean {
@@ -108,7 +108,7 @@ export function mimeMatches(claimed: string, sniffed: string | null): boolean {
   if (c === s) return true
   if (c === '' || c === 'application/octet-stream') return true
 
-  // Tolerate ZIP-based document formats — the magic bytes only say "this
+  // Tolerate ZIP-based document formats - the magic bytes only say "this
   // is a ZIP container", which is the truthful low-level answer. Any
   // claimed Office / OpenDocument / JAR / APK / EPUB type is consistent.
   if (s === 'application/zip') {

@@ -97,7 +97,7 @@ export namespace Client {
      * client-claimed `file.type` are rejected with a `validation_failed`
      * reason. When `false` (default), only a one-time `console.warn`
      * notice is emitted per mismatched format. Unknown signatures are
-     * always allowed through — this is defense-in-depth, not a deny-
+     * always allowed through - this is defense-in-depth, not a deny-
      * list.
      */
     strictMimeMatch: boolean

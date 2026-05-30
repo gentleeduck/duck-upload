@@ -1,14 +1,4 @@
-/**
- * @fileoverview Public exports for upload strategies.
- *
- * Re-exports all strategy implementations and types for convenient importing.
- *
- * Available strategies:
- * - PostStrategy: Simple POST uploads (presigned forms)
- * - multipartStrategy: Chunked multipart uploads (S3-style, resumable)
- *
- * @module upload-strategies
- */
+/** Re-exports of upload strategy implementations: {@link PostStrategy}, {@link multipartStrategy}. */
 
 export * from './multipart'
 export * from './post'

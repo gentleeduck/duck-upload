@@ -6,8 +6,8 @@
  * with `dangerouslySetInnerHTML` or via `innerHTML` would execute filenames
  * like `<img src=x onerror=alert(1)>.png` as HTML/JS.
  *
- * {@link UploadEngineError} keeps a **static** `message` per `code` — safe to render
- * directly. All tainted, attacker-controlled values (filename, fileId, …)
+ * {@link UploadEngineError} keeps a **static** `message` per `code` - safe to render
+ * directly. All tainted, attacker-controlled values (filename, fileId, ...)
  * live on the structured {@link UploadEngineError.context} field.
  *
  * Consumer contract:
@@ -29,7 +29,7 @@ const STATIC_MESSAGES: Record<string, string> = {
  *
  * Always carries a stable {@link UploadEngineError.code} and an immutable, static
  * {@link UploadEngineError.message}. Filename and other tainted strings are placed
- * in {@link UploadEngineError.context} — never in the message.
+ * in {@link UploadEngineError.context} - never in the message.
  *
  * @example
  * ```ts

@@ -24,11 +24,11 @@ export const __checksumNoticesEmitted = new Set<string>()
  * SHA-256 checksum of `file` for deduplication.
  *
  * SEC-007/018: when `file.size` exceeds the resolved cap, the checksum is
- * **skipped entirely** and `null` is returned — no I/O is performed on
+ * **skipped entirely** and `null` is returned - no I/O is performed on
  * `file` (neither `arrayBuffer()` nor `stream()` is called). The previous
  * streaming implementation accumulated every chunk into a `Uint8Array[]`
  * then concatenated into a single contiguous buffer for `subtle.digest`,
- * yielding a peak memory of ~2× file size — strictly worse than the
+ * yielding a peak memory of ~2x file size - strictly worse than the
  * arrayBuffer path it was meant to replace. A bounded-memory streaming
  * path would require an incremental SHA-256 implementation, which the
  * Web Crypto API does not provide; vendoring one is out of scope for
@@ -42,7 +42,10 @@ export const __checksumNoticesEmitted = new Set<string>()
  * @returns hex SHA-256 digest, or `null` when `file.size > cap`.
  */
 export async function calculateFileChecksum(file: File, maxSize: number | null = null): Promise<string | null> {
-  const cap = maxSize && maxSize > 0 ? maxSize : DEFAULT_CHECKSUM_MAX_SIZE
+  // Use the caller-supplied cap only when it's a finite positive number.
+  // NaN / Infinity / 0 / negative all fall back to the conservative default.
+  const cap =
+    typeof maxSize === 'number' && Number.isFinite(maxSize) && maxSize > 0 ? maxSize : DEFAULT_CHECKSUM_MAX_SIZE
   if (file.size > cap) {
     if (!__checksumNoticesEmitted.has('skipped-oversize')) {
       __checksumNoticesEmitted.add('skipped-oversize')
@@ -69,7 +72,15 @@ export function isAutoStart<M extends IntentMap, C extends CursorMap<M>, P exten
   const v = opts.config?.autoStart
   if (v === undefined) return false
   if (Array.isArray(v)) return v.includes(purpose)
-  if (typeof v === 'function') return v(purpose)
+  if (typeof v === 'function') {
+    // Fail-closed if the user-supplied predicate throws so a buggy
+    // predicate can't stop the entire addFiles flow.
+    try {
+      return v(purpose) === true
+    } catch {
+      return false
+    }
+  }
   return false
 }
 
@@ -82,8 +93,8 @@ export { computeFingerprint, fingerprintMatches }
 
 /**
  * Normalize a thrown value into an {@link UploadError}. Override via
- * {@link StoreOptions.errorNormalizer}. Default: aborts → non-retryable;
- * network errors → retryable; HTTP 5xx/429 → retryable.
+ * {@link StoreOptions.errorNormalizer}. Default: aborts -> non-retryable;
+ * network errors -> retryable; HTTP 5xx/429 -> retryable.
  */
 export function normalizeError(err: unknown, customNormalizer?: (err: unknown) => UploadError): UploadError {
   if (customNormalizer) return customNormalizer(err)

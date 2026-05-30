@@ -101,7 +101,7 @@ export function createReducer<
           if (!item.file) break
 
           if (item.intent) {
-            // Progress at 100% with intent means we failed in 'completing' — retry that phase.
+            // Progress at 100% with intent means we failed in 'completing' - retry that phase.
             if (item.progress && item.progress.pct === 100) {
               set(event.localId, {
                 ...item,

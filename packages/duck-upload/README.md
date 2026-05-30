@@ -97,6 +97,10 @@ A full working demo lives at `packages/registry-examples/src/upload/upload-1.tsx
 - **Rebind**  -  rebind a paused, persisted item to a fresh `File` after refresh, with fingerprint validation
 - **Plugins + hooks**  -  `onInternalEvent`, `onPersistenceError`, custom plugins
 - **No DOM coupling**  -  works in Workers, Node 22+, or the browser
+- **SSRF guard built in**  -  every backend-supplied URL (POST + multipart) runs through `validateUploadUrl` (allowlist + protocol + IPv4/IPv6 private + cloud-metadata + NAT64 + 6to4 + IPv4-mapped checks) before any byte leaves the client
+- **Filename + MIME hardening**  -  NFKC normalize, control-char strip, Windows reserved-name + 255-char + path-sep + leading-dash + trailing-dot rejection; magic-byte sniff cross-checks the claimed `file.type`
+- **NaN-safe configs**  -  every numeric option (`maxAttempts`, `maxConcurrentUploads`, timeouts, byte caps) clamps `NaN`/`Infinity`/negative back to the default; persisted snapshots reject `NaN` fields
+- **Threat model + audit**  -  STRIDE-mapped `THREAT-MODEL.md` and re-runnable `AUDIT-RESULTS.md` checked into the package
 
 ## Subpath Exports
 

@@ -1,11 +1,4 @@
-/**
- * Public contract types grouped under the `Contracts` namespace.
- *
- * Each sub-namespace owns one concern (Intent, Cursor, Result, Fingerprint,
- * Errors, Validation, Strategy, BackendApi).
- *
- * @author wildduck2 <https://github.com/wildduck2>
- */
+/** Public contract types: Intent, Cursor, Result, Fingerprint, Errors, Validation, Strategy, BackendApi. */
 export namespace Contracts {
   // -------------------- Intent --------------------
 
