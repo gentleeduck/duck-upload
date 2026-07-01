@@ -1,23 +1,44 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    "allowJs": true,
-    "esModuleInterop": true,
-    "incremental": true,
-    "isolatedModules": true,
-    "jsx": "react-jsx",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    /* Type Checking - strict mode + every extra safety net */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    "useUnknownInCatchVariables": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Modules */
     "module": "esnext",
     "moduleResolution": "bundler",
-    "noEmit": true,
-    "paths": {},
-    "plugins": [],
     "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "paths": {},
+
+    /* Emit - tsc used for type-checking only; bundler/runtime handles actual emit */
+    "noEmit": true,
+    "incremental": true,
+
+    /* JS/JSX support */
+    "allowJs": true,
+    "jsx": "react-jsx",
+
+    /* Language & Environment */
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
-    "strict": true,
-    "target": "ES2017",
     "types": ["node"]
   },
-  "exclude": [],
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "dist", "build"]
 }
