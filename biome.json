@@ -129,7 +129,8 @@
       "complexity": {
         "noBannedTypes": "off",
         "noImportantStyles": "warn",
-        "noThisInStatic": "warn"
+        "noThisInStatic": "warn",
+        "useLiteralKeys": "off"
       },
       "correctness": {
         "noChildrenProp": "warn",
@@ -198,6 +199,20 @@
         "indentWidth": 2
       },
       "includes": ["**/*.json"]
+    },
+    {
+      "includes": [
+        "packages/duck-upload/src/core/contracts/contracts.types.ts",
+        "packages/duck-upload/src/core/utils/emitter/emitter.types.ts",
+        "packages/duck-upload/src/react/upload-provider.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
     }
   ],
   "plugins": []
