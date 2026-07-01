@@ -1,105 +1,89 @@
-'use client'
-
 import * as React from 'react'
-import type {
-  CursorMap,
-  IntentMap,
-  UploadCommand,
-  UploadEventMap,
-  UploadItem,
-  UploadPhase,
-  UploadResultBase,
-} from '../core'
-import type { UploadStore } from '../core/engine/store'
-import { useOptionalUploadStore, useUploadStore } from './upload-provider'
-
-export function createUploadFactory<
-  M extends IntentMap,
-  C extends CursorMap<M>,
-  P extends string,
-  R extends UploadResultBase = UploadResultBase,
->(store: UploadStore<M, C, P, R>) {
-  return () => useUploader<M, C, P, R>(store)
-}
-
-export type PickItemsByPhase<Phase extends UploadPhase> = Extract<
-  UploadItem<IntentMap, CursorMap<IntentMap>, string, UploadResultBase>,
-  { phase: Phase }
->
-
-type Uploader<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase> = {
-  items: UploadItem<M, C, P, R>[]
-  byPhase: Record<string, UploadItem<M, C, P, R>[]>
-  dispatch: (cmd: UploadCommand<P>) => void
-  on: <K extends keyof UploadEventMap<M, C, P, R> & string>(
-    type: K,
-    cb: (payload: UploadEventMap<M, C, P, R>[K]) => void,
-  ) => () => void
-  off: <K extends keyof UploadEventMap<M, C, P, R> & string>(
-    type: K,
-    cb: (payload: UploadEventMap<M, C, P, R>[K]) => void,
-  ) => () => void
-  uploading: UploadItem<M, C, P, R>[]
-  paused: UploadItem<M, C, P, R>[]
-  completed: UploadItem<M, C, P, R>[]
-  failed: UploadItem<M, C, P, R>[]
-  ready: UploadItem<M, C, P, R>[]
-}
+import { useMemo, useSyncExternalStore } from 'react'
+import type { Contracts, Engine } from '../core'
+import type { Store } from '../core/engine/store'
+import { useUploadStore } from './upload-provider'
+import type { Uploader } from './uploader.types'
 
 /**
- * Imperative action surface. Declared explicitly (not inferred) so generated
- * .d.ts files do not leak internal generic names created by `store.on.bind(store)`.
+ * Hook to consume the upload store state, track files, and interact with the upload engine.
+ *
+ * Exposes files, categorizes items by status phase (ready, uploading, paused, completed, failed),
+ * and registers action dispatchers.
+ *
+ * Can optionally be passed a specific store instance directly. Otherwise, it will read the store from context.
+ *
+ * @example
+ * ```tsx
+ * function UploadForm() {
+ *   const { items, uploading, dispatch } = useUploader();
+ *
+ *   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+ *     if (e.target.files) {
+ *       dispatch({ type: 'addFiles', files: Array.from(e.target.files), purpose: 'avatar' });
+ *     }
+ *   };
+ *
+ *   return (
+ *     <div>
+ *       <input type="file" onChange={onFileChange} multiple />
+ *       <ul>
+ *         {items.map(item => (
+ *           <li key={item.localId}>{item.fingerprint.name} - {item.phase}</li>
+ *         ))}
+ *       </ul>
+ *     </div>
+ *   );
+ * }
+ * ```
+ *
+ * @template M - Intent map type
+ * @template C - Cursor map type
+ * @template P - Purpose string union type
+ * @template R - Backend result shape
  */
-export type UploaderActions<
-  M extends IntentMap,
-  C extends CursorMap<M>,
-  P extends string,
-  R extends UploadResultBase = UploadResultBase,
-> = Pick<UploadStore<M, C, P, R>, 'dispatch' | 'on'> & {
-  store: UploadStore<M, C, P, R>
-}
-
 export function useUploader<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase = UploadResultBase,
->(): Uploader<M, C, P, R>
-export function useUploader<
-  M extends IntentMap,
-  C extends CursorMap<M>,
-  P extends string,
-  R extends UploadResultBase = UploadResultBase,
->(store: UploadStore<M, C, P, R>): Uploader<M, C, P, R>
-export function useUploader<
-  M extends IntentMap,
-  C extends CursorMap<M>,
-  P extends string,
-  R extends UploadResultBase = UploadResultBase,
->(providedStore?: UploadStore<M, C, P, R> | undefined) {
-  const contextStore = useOptionalUploadStore<M, C, P, R>()
+  R extends Contracts.Result.Base = Contracts.Result.Base,
+>(providedStore?: Store.UploadStore<M, C, P, R> | undefined): Uploader.State<M, C, P, R> {
+  const contextStore = useUploadStore<M, C, P, R>()
   const store = providedStore ?? contextStore
+
   if (!store) {
-    throw new Error('useUploader must be used within UploadProvider when no store argument is provided')
+    throw new Error('useUploader must be used within an <UploadProvider> or passed a store instance directly.')
   }
 
-  const snapshot = React.useSyncExternalStore(
-    store.subscribe.bind(store),
-    store.getSnapshot.bind(store),
-    store.getSnapshot.bind(store),
+  const state = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot, // SSR fallback placeholder.
   )
 
-  const items = React.useMemo(() => {
-    return Array.from(snapshot.items.values())
-  }, [snapshot.items])
+  const items = useMemo(() => {
+    return Array.from(state.items.values())
+  }, [state])
 
-  const byPhase = React.useMemo(() => {
-    const result: Record<string, UploadItem<M, C, P, R>[]> = {}
+  const byPhase = useMemo(() => {
+    const result: Record<Engine.Phase, Array<Engine.Item<M, C, P, R>>> = {
+      validating: [],
+      creating_intent: [],
+      ready: [],
+      queued: [],
+      uploading: [],
+      paused: [],
+      completing: [],
+      completed: [],
+      error: [],
+      canceled: [],
+    }
     items.forEach((item) => {
-      if (!result[item.phase]) {
-        result[item.phase] = []
+      const phase = item.phase
+      if (!result[phase]) {
+        result[phase] = []
       }
-      result[item.phase].push(item)
+      result[phase].push(item)
     })
     return result
   }, [items])
@@ -118,16 +102,36 @@ export function useUploader<
   }
 }
 
+/**
+ * Returns the store's imperative actions (dispatch, event bindings) along with a direct
+ * reference to the store instance. Does not trigger React re-renders on upload progress or state changes.
+ *
+ * Use this when you only need to trigger commands or subscribe to events without binding UI lists.
+ */
 export function useUploaderActions<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase = UploadResultBase,
->(): UploaderActions<M, C, P, R> {
+  R extends Contracts.Result.Base = Contracts.Result.Base,
+>(): Uploader.IActions<M, C, P, R> {
   const store = useUploadStore<M, C, P, R>()
 
   const dispatch = React.useMemo(() => store.dispatch.bind(store), [store])
   const on = React.useMemo(() => store.on.bind(store), [store])
 
   return { dispatch, on, store }
+}
+
+/**
+ * Creates a bound `useUploader` hook pre-configured for a specific store instance.
+ *
+ * Useful for building static multi-uploader widgets or context-free setups.
+ */
+export function createUploadFactory<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base = Contracts.Result.Base,
+>(store: Store.UploadStore<M, C, P, R>) {
+  return () => useUploader<M, C, P, R>(store)
 }

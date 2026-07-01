@@ -1,70 +1,93 @@
-'use client'
+import type React from 'react'
+import { createContext, useContext, useEffect } from 'react'
+import type { Contracts } from '../core'
+import type { Store } from '../core/engine/store'
 
-import { createContext, type ReactNode, useContext } from 'react'
-import { type CursorMap, type IntentMap, isRecord, type UploadResultBase } from '../core'
-import type { UploadStore } from '../core/engine/store'
+const UploadContext = createContext<Store.UploadStore<any, any, any, any> | null>(null)
 
-// React Context can't carry generics, so the runtime value is `unknown`; the
-// hooks below re-narrow with `isUploadStore`.
-const UploadContext = createContext<unknown | null>(null)
-
-/** Provides an upload store to descendants. */
-export function UploadProvider<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+/**
+ * Props for the `<UploadProvider>` component.
+ */
+export interface UploadProviderProps<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase = UploadResultBase,
->({ store, children }: { store: UploadStore<M, C, P, R>; children: ReactNode }): React.JSX.Element {
+  R extends Contracts.Result.Base = Contracts.Result.Base,
+> {
+  /** The upload store instance to distribute. */
+  store: Store.UploadStore<M, C, P, R>
+  /** React child elements. */
+  children: React.ReactNode
+}
+
+/**
+ * Context provider that distributes the upload store across the React component hierarchy.
+ *
+ * Wrap this provider around the top of your layout to enable child hooks like `useUploader`
+ * to access upload status.
+ *
+ * @example
+ * ```tsx
+ * const store = createUploadStore({ ... });
+ *
+ * function App() {
+ *   return (
+ *     <UploadProvider store={store}>
+ *       <UploadForm />
+ *     </UploadProvider>
+ *   );
+ * }
+ * ```
+ */
+export function UploadProvider<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base = Contracts.Result.Base,
+>({ store, children }: UploadProviderProps<M, C, P, R>) {
+  // Safe cleanup: destroy the store runner instance if the provider is unmounted.
+  useEffect(() => {
+    return () => {
+      if ('destroy' in store && typeof store.destroy === 'function') {
+        ;(store as unknown as { destroy: () => void }).destroy()
+      }
+    }
+  }, [store])
+
   return <UploadContext.Provider value={store}>{children}</UploadContext.Provider>
 }
 
 /**
- * Read the upload store from context if provided. Returns `null` outside a
- * provider so higher-level hooks can keep their context read unconditional
- * while still accepting an explicit store argument.
+ * Returns the active upload store instance from context.
+ * Throws a runtime exception if called outside an `<UploadProvider>`.
  */
-export function useOptionalUploadStore<
-  M extends IntentMap,
-  C extends CursorMap<M>,
-  P extends string,
-  R extends UploadResultBase = UploadResultBase,
->(): UploadStore<M, C, P, R> | null {
-  const store = useContext(UploadContext)
-  if (store === null) {
-    return null
-  }
-
-  if (!isUploadStore<M, C, P, R>(store)) {
-    throw new Error('UploadProvider received an invalid store value')
-  }
-
-  return store
-}
-
-/** Read the upload store from context. Throws when called outside `UploadProvider`. */
 export function useUploadStore<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase = UploadResultBase,
->(): UploadStore<M, C, P, R> {
-  const store = useOptionalUploadStore<M, C, P, R>()
-  if (!store) {
-    throw new Error('useUploadStore must be used within UploadProvider')
+  R extends Contracts.Result.Base = Contracts.Result.Base,
+>(): Store.UploadStore<M, C, P, R> {
+  const context = useContext(UploadContext)
+  if (!context) {
+    throw new Error('useUploadStore must be used within an <UploadProvider>')
   }
-  return store
+  return context as Store.UploadStore<M, C, P, R>
 }
 
-function isUploadStore<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  value: unknown,
-): value is UploadStore<M, C, P, R> {
-  if (!isRecord(value)) return false
+export function isUploadStore<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base = Contracts.Result.Base,
+>(value: unknown): value is Store.UploadStore<M, C, P, R> {
+  if (typeof value !== 'object' || value === null) return false
+  const val = value as Record<string, unknown>
   return (
-    typeof value.getSnapshot === 'function' &&
-    typeof value.subscribe === 'function' &&
-    typeof value.dispatch === 'function' &&
-    typeof value.on === 'function' &&
-    typeof value.off === 'function' &&
-    typeof value.waitFor === 'function'
+    typeof val['getSnapshot'] === 'function' &&
+    typeof val['subscribe'] === 'function' &&
+    typeof val['dispatch'] === 'function' &&
+    typeof val['on'] === 'function' &&
+    typeof val['off'] === 'function' &&
+    typeof val['waitFor'] === 'function'
   )
 }

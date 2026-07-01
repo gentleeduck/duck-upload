@@ -1,41 +1,74 @@
+import type { Contracts } from '../../core'
+import { UploadEngineError } from '../../core'
+
+export namespace PostStrategy {
+  /**
+   * Presigned HTTP POST strategy configuration options.
+   */
+  export type Config = {
+    /**
+     * Case-insensitive allow-list of host names (with optional port). When
+     * set, the presigned POST URL must match a listed host or it is rejected.
+     */
+    allowedHosts?: string[]
+    /**
+     * When `true`, allow private-network IP literals in the POST URL.
+     * Defaults to `false`.
+     */
+    allowPrivateHosts?: boolean
+  }
+
+  /**
+   * Presigned HTTP POST intent payload mapping parameters returned by backend endpoints.
+   */
+  export type Intent = {
+    /** Discriminant identifier matching strategy configuration registry keys. */
+    strategy: 'post'
+    /** Unique database identifier for the file resource. */
+    fileId: string
+    /** Presigned POST action destination URL (e.g. presigned S3/GCS bucket location). */
+    url: string
+    /** Key/value pair list representing form properties (e.g. AWS credential fields, policies). */
+    fields: Record<string, string>
+    /** Optional epoch string indicating when the pre-signed credentials lapse. */
+    expiresAt?: string
+  }
+
+  /**
+   * Direct strategy cursor state representing that no resumable bytes exist.
+   */
+  export type Cursor = Record<string, never>
+}
+
 /**
- * Presigned-POST strategy: a single `multipart/form-data` POST with
- * server-provided fields. Non-resumable; suitable for small/medium files.
+ * Presigned HTTP POST form strategy.
+ *
+ * Sends the entire file along with backend policy fields as a single
+ * `multipart/form-data` request body. Does not support resumability.
+ *
+ * @example
+ * ```ts
+ * const strategies = createStrategyRegistry([
+ *   PostStrategy(),
+ *   MultipartStrategy()
+ * ]);
+ * ```
  */
-
-import type { CursorMap, IntentMap, UploadResultBase, UploadStrategy } from '../../core/contracts'
-
-export type PostIntent = {
-  strategy: 'post'
-  fileId: string
-  /** Presigned POST URL (form action). */
-  url: string
-  /** Form fields to include before the file. */
-  fields: Record<string, string>
-  /** Optional expiry of the presigned URL. */
-  expiresAt?: string
-}
-
-export type PostCursor = {
-  /** Bytes uploaded — progress display only; not used for resume. */
-  uploadedBytes: number
-}
-
 export function PostStrategy<
-  M extends IntentMap & { post: PostIntent },
-  C extends CursorMap<M> & { post?: PostCursor },
-  P extends string = string,
-  R extends UploadResultBase = UploadResultBase,
->(): UploadStrategy<M, C, P, R, 'post'> {
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base = Contracts.Result.Base,
+>(): Contracts.Strategy.Me<M, C, P, R, 'post'> {
   return {
     id: 'post',
     resumable: false,
 
     async start(ctx) {
-      const intent = ctx.intent
+      const intent = ctx.intent as unknown as PostStrategy.Intent
 
       if (!intent.url) {
-        throw new Error('Direct strategy: intent missing url/uploadUrl')
+        throw new UploadEngineError('validation_failed', { message: 'Direct strategy: intent missing url/uploadUrl' })
       }
 
       await ctx.transport.postForm({
