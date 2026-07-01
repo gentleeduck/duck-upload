@@ -1,15 +1,13 @@
-import { resolveUploadConfig } from '../../client'
-import type { CursorMap, IntentMap, UploadResultBase } from '../../contracts'
+import type { Contracts } from '../../contracts'
 import { createXHRTransport } from '../../contracts/transport'
 import { deserializeSnapshot, serializeSnapshot } from '../../persistence'
 import { createTypedEmitter } from '../../utils/emitter'
-import type { UploadCommand } from '../commands.types'
-import type { UploadEventMap } from '../event-map.types'
-import type { InternalEvent, UploadItem } from '../internal-events.types'
-import { createReducer, type UploadState } from '../reducer'
+import { resolveUploadConfig } from '../engine.libs'
+import type { Engine } from '../engine.types'
+import { createReducer } from '../reducer'
 import { cleanupOldItems } from './handlers/clean-up'
 import { scheduleWork } from './store.schedule'
-import type { InflightUpload, StoreOptions, StoreRuntime } from './store.types'
+import type { Store } from './store.types'
 
 /**
  * Build the store runtime: state, emitter, reducer, and effect queue.
@@ -17,11 +15,11 @@ import type { InflightUpload, StoreOptions, StoreRuntime } from './store.types'
  * `dispatch` is assigned later by `createUploadStore` to break an import cycle.
  */
 export function createStoreRuntime<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase = UploadResultBase,
->(opts: StoreOptions<M, C, P, R>): StoreRuntime<M, C, P, R> {
+  R extends Contracts.Result.Base = Contracts.Result.Base,
+>(opts: Store.Options<M, C, P, R>): Store.Runtime<M, C, P, R> {
   const resolvedOpts = resolveStoreOptions(opts)
   const persistence = resolvedOpts.persistence
 
@@ -43,7 +41,7 @@ export function createStoreRuntime<
 
       await persistence.adapter.save(persistence.key, snap)
     } catch (err) {
-      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
         console.warn('[UploadEngine] persistence flush failed:', err)
       }
     }
@@ -59,21 +57,21 @@ export function createStoreRuntime<
     persistTimer = setTimeout(() => void flushPersistence(), persistDebounceMs)
   }
 
-  const initialState: UploadState<M, C, P, R> = resolvedOpts.initialState ?? {
-    items: new Map<string, UploadItem<M, C, P, R>>(),
+  const initialState: Engine.State<M, C, P, R> = resolvedOpts.initialState ?? {
+    items: new Map<string, Engine.Item<M, C, P, R>>(),
   }
 
   const effectQueue: Array<() => Promise<void>> = []
 
-  const rt: StoreRuntime<M, C, P, R> = {
+  const rt: Store.Runtime<M, C, P, R> = {
     opts: resolvedOpts,
     state: initialState,
 
     listeners: new Set<() => void>(),
-    emitter: createTypedEmitter<UploadEventMap<M, C, P, R>>(),
+    emitter: createTypedEmitter<Engine.EventMap<M, C, P, R>>(),
     reduce: createReducer<M, C, P, R>(),
 
-    inflightUploads: new Map<string, InflightUpload>(),
+    inflightUploads: new Map<string, Store.InflightUpload>(),
     inflightIntents: new Map<string, AbortController>(),
     inflightCompletes: new Map<string, AbortController>(),
 
@@ -91,7 +89,7 @@ export function createStoreRuntime<
       scheduleWork(rt)
     },
 
-    applyInternal(event: InternalEvent<M, C, P, R>) {
+    applyInternal(event: Engine.Event<M, C, P, R>) {
       const prev = rt.state
       const next = rt.reduce(prev, event)
       rt.state = next
@@ -107,7 +105,7 @@ export function createStoreRuntime<
       rt.scheduleWork()
     },
 
-    applyCommand(cmd: UploadCommand<P>) {
+    applyCommand(cmd: Engine.Command<P>) {
       const prev = rt.state
       const next = rt.reduce(prev, cmd)
       rt.state = next
@@ -135,7 +133,7 @@ export function createStoreRuntime<
         try {
           await effect()
         } catch (err) {
-          if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+          if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
             const error = err instanceof Error ? err : new Error(String(err))
             const context = {
               queueLength: rt.effectQueue.length,
@@ -153,7 +151,7 @@ export function createStoreRuntime<
     dispatch: () => {
       throw new Error('[UploadEngine] dispatch not initialized')
     },
-  } satisfies StoreRuntime<M, C, P, R>
+  } satisfies Store.Runtime<M, C, P, R>
 
   // Async adapters (IndexedDB) resolve after construction; only hydrate when no
   // initialState was provided. Merge into an empty store only — never clobber
@@ -195,9 +193,12 @@ export function createStoreRuntime<
   return rt
 }
 
-function resolveStoreOptions<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  opts: StoreOptions<M, C, P, R>,
-): StoreRuntime<M, C, P, R>['opts'] {
+function resolveStoreOptions<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base,
+>(opts: Store.Options<M, C, P, R>): Store.Runtime<M, C, P, R>['opts'] {
   return {
     ...opts,
     config: resolveUploadConfig(opts.config),
@@ -205,10 +206,12 @@ function resolveStoreOptions<M extends IntentMap, C extends CursorMap<M>, P exte
   }
 }
 
-function emitInternalEvent<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  rt: StoreRuntime<M, C, P, R>,
-  event: InternalEvent<M, C, P, R>,
-) {
+function emitInternalEvent<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>, event: Engine.Event<M, C, P, R>) {
   switch (event.type) {
     case 'files.added': {
       for (const item of event.items) {
@@ -298,11 +301,16 @@ function emitInternalEvent<M extends IntentMap, C extends CursorMap<M>, P extend
   }
 }
 
-function emitCommandEvents<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  rt: StoreRuntime<M, C, P, R>,
-  cmd: UploadCommand<P>,
-  prev: UploadState<M, C, P, R>,
-  next: UploadState<M, C, P, R>,
+function emitCommandEvents<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base,
+>(
+  rt: Store.Runtime<M, C, P, R>,
+  cmd: Engine.Command<P>,
+  prev: Engine.State<M, C, P, R>,
+  next: Engine.State<M, C, P, R>,
 ) {
   if (cmd.type === 'start' || cmd.type === 'resume') {
     const prevItem = prev.items.get(cmd.localId)

@@ -1,13 +1,13 @@
-import type { CursorMap, IntentMap, UploadResultBase } from '../../../contracts'
-import type { UploadState } from '../../reducer'
-import type { StoreOptions } from '../store.types'
+import type { Contracts } from '../../../contracts'
+import type { Engine } from '../../engine.types'
+import type { Store } from '../store.types'
 
 export function cleanupOldItems<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase,
->(opts: StoreOptions<M, C, P, R>, state: UploadState<M, C, P, R>): UploadState<M, C, P, R> | null {
+  R extends Contracts.Result.Base,
+>(opts: Store.Options<M, C, P, R>, state: Engine.State<M, C, P, R>): Engine.State<M, C, P, R> | null {
   const maxItems = opts.config?.maxItems
   const completedTTL = opts.config?.completedItemTTL
   const now = Date.now()
@@ -50,7 +50,10 @@ export function cleanupOldItems<
 
     const excess = remainingItems.length - maxItems
     for (let i = 0; i < excess && i < completedOrCanceled.length; i++) {
-      toRemove.push(completedOrCanceled[i][0])
+      const entry = completedOrCanceled[i]
+      if (entry) {
+        toRemove.push(entry[0])
+      }
     }
   }
 

@@ -1,250 +1,199 @@
-import type { UploadConfig, UploadConfigInput, UploadHooks, UploadPlugin } from '../../client'
-import type {
-  CursorMap,
-  FileFingerprint,
-  IntentMap,
-  RejectReason,
-  StrategyRegistry,
-  UploadApi,
-  UploadError,
-  UploadResultBase,
-  UploadTransport,
-} from '../../contracts'
-import type { PersistedSnapshot, PersistenceAdapter } from '../../persistence'
-import type { TypedEmitter } from '../../utils/emitter'
-import type { UploadCommand } from '../commands.types'
-import type { UploadEventMap } from '../event-map.types'
-import type { InternalEvent } from '../internal-events.types'
-import type { UploadOutcome } from '../outcome.types'
-import type { createReducer, UploadState } from '../reducer'
+import type { Contracts, Transport } from '../../contracts'
+import type { UploadPersistence } from '../../persistence'
+import type { Emitter } from '../../utils'
+import type { Engine } from '../engine.types'
+import type { createReducer } from '../reducer'
 
 /**
- * Upload store interface used by UI adapters and application code.
- *
- * The store is intentionally minimal:
- * - state is read through {@link UploadStore.getSnapshot}
- * - updates are observed through {@link UploadStore.subscribe} and {@link UploadStore.on}
- * - actions are performed through {@link UploadStore.dispatch}
- *
- * @template M - Intent map type (keyed by strategy id)
- * @template C - Cursor map type (keyed by strategy id)
- * @template P - Purpose string union type
+ * Store-level namespaces and contracts.
  */
-export interface UploadStore<
-  M extends IntentMap,
-  C extends CursorMap<M>,
-  P extends string,
-  R extends UploadResultBase = UploadResultBase,
-> {
+export namespace Store {
   /**
-   * Returns the current immutable state snapshot.
-   * Useful for React loops or debugging.
-   */
-  getSnapshot(): UploadState<M, C, P, R>
-  /**
-   * Subscribes to ANY state change.
-   * The listener is called after the reducer has run and effects have been scheduled.
-   * @param listener - Listener function to call on state change
-   */
-  subscribe(listener: () => void): () => void
-  /**
-   * Main entry point for user actions.
-   * Converts external commands into internal state transitions and side effects.
+   * Public upload store interface used by UI adapters and application code.
    *
-   * @param cmd The command to execute (e.g. 'addFiles', 'start', 'pause')
+   * Coordinates commands, subscriptions, event bindings, and lifecycle states.
+   *
+   * @template M - Intent map type (keyed by strategy id)
+   * @template C - Cursor map type (keyed by strategy id)
+   * @template P - Purpose string union type
+   * @template R - Backend result shape
    */
-  dispatch(cmd: UploadCommand<P>): void
-  /**
-   * Subscribes to specific events (like 'file.added', 'upload.progress').
-   * Wraps the internal typed emitter.
-   */
-  on: <K extends keyof UploadEventMap<M, C, P, R> & string>(
-    type: K,
-    cb: (payload: UploadEventMap<M, C, P, R>[K]) => void,
-  ) => () => void
+  export type UploadStore<
+    M extends Contracts.Intent.Map,
+    C extends Contracts.Cursor.Map<M>,
+    P extends string,
+    R extends Contracts.Result.Base = Contracts.Result.Base,
+  > = {
+    /**
+     * Returns the current immutable state snapshot.
+     * Use this in custom React lifecycle bindings or debug inspectors.
+     */
+    getSnapshot(): Engine.State<M, C, P, R>
 
-  /**
-   * Unsubscribes from specific events (like 'file.added', 'upload.progress').
-   * Wraps the internal typed emitter.
-   */
-  off: <K extends keyof UploadEventMap<M, C, P, R> & string>(
-    type: K,
-    cb: (payload: UploadEventMap<M, C, P, R>[K]) => void,
-  ) => () => void
+    /**
+     * Subscribes to any internal state change.
+     * Triggered after reducers process events and side effects are queued.
+     *
+     * @param listener - Callback invoked on state updates.
+     * @returns An unsubscribe function.
+     */
+    subscribe(listener: () => void): () => void
 
-  /**
-   * Waits for the given localIds to reach a terminal state.
-   */
-  waitFor(localIds: string[]): Promise<Array<UploadOutcome<R>>>
-}
+    /**
+     * Dispatches a command to initiate state transitions (e.g. adding files, pausing, canceling).
+     *
+     * @param cmd - Public command payload.
+     */
+    dispatch(cmd: Engine.Command<P>): void
 
-/**
- * Options used to construct a store runtime.
- *
- * In practice you provide:
- * - a backend adapter ({@link UploadApi}) that creates intents and finalizes uploads
- * - a transport implementation (XHR, fetch, etc.) used by strategies
- * - a strategy registry describing what upload strategies exist and how to run them
- * - configuration rules for validation, concurrency, retries, and progress throttling
- *
- * Hooks and plugins are optional and let you observe or extend behavior without forking
- * the engine.
- *
- * @template M - Intent map type (keyed by strategy id)
- * @template C - Cursor map type (keyed by strategy id)
- * @template P - Purpose string union type
- */
-export interface StoreOptions<
-  M extends IntentMap,
-  C extends CursorMap<M>,
-  P extends string,
-  R extends UploadResultBase = UploadResultBase,
-> {
-  /** Initial state to hydrate from (e.g. from localStorage) */
-  initialState?: UploadState<M, C, P, R>
-  /** Static configuration rules (defaults are applied). */
-  config?: UploadConfigInput<P>
-  /** Persistence adapter and options */
-  persistence?: PersistenceOptions<M, C, P, R>
-  /** Backend API adapter for creating intents and finalizing uploads */
-  api: UploadApi<M, P, R>
-  /** Network transport (XHR/Fetch) for the actual file data transfer */
-  transport?: UploadTransport
-  /** Registry of available upload strategies (multipart, simple, etc.) */
-  strategies: StrategyRegistry<M, C, P, R>
-  /** Optional plugins to extend functionality (e.g. debugging, metrics) */
-  plugins?: Array<UploadPlugin<M, C, P, R>>
-  /** Lifecycle hooks for observing internal events */
-  hooks?: UploadHooks<M, C, P, R>
-  /**
-   * Optional custom fingerprinting (e.g. include sha256).
-   * Must be synchronous to keep addFiles fast.
-   */
-  fingerprint?: (file: File) => FileFingerprint
-  /**
-   * If returns non-null, it rejects the file.
-   * Runs after built-in config validation.
-   */
-  validateFile?: (file: File, purpose: P) => RejectReason | null
-  /**
-   * Optional custom error normalizer.
-   * Convert raw errors (from fetch, XHR, etc.) into your custom UploadError shape.
-   */
-  errorNormalizer?: (err: unknown) => UploadError
-}
+    /**
+     * Binds a listener to a specific typed event (e.g. `'upload.progress'`).
+     *
+     * @param type - Event name key.
+     * @param cb - Event listener callback.
+     * @returns An unsubscribe function.
+     */
+    on: <K extends keyof Engine.EventMap<M, C, P, R> & string>(
+      type: K,
+      cb: (payload: Engine.EventMap<M, C, P, R>[K]) => void,
+    ) => () => void
 
-/**
- * Persistence options.
- *
- * Used to configure the upload store persistence layer.
- */
-export type DeserializeContext<M extends IntentMap, _C extends CursorMap<M>, P extends string> = {
-  isPurpose?: (value: string) => value is P
-  isIntent?: (value: unknown) => value is M[keyof M]
-  hasStrategy: (value: string) => boolean
-}
+    /**
+     * Removes an event listener.
+     *
+     * @param type - Event name key.
+     * @param cb - Event listener callback.
+     */
+    off: <K extends keyof Engine.EventMap<M, C, P, R> & string>(
+      type: K,
+      cb: (payload: Engine.EventMap<M, C, P, R>[K]) => void,
+    ) => void
 
-export type PersistenceOptions<
-  M extends IntentMap,
-  C extends CursorMap<M>,
-  P extends string,
-  R extends UploadResultBase,
-> = {
-  /** Persistence key (e.g. localStorage key) */
-  key: string
-  /** Persistence schema version (not app version) */
-  version: number
-  /** Debounce delay in milliseconds (default: 200) */
-  debounceMs?: number
-  /** Persistence adapter */
-  adapter: PersistenceAdapter
+    /**
+     * Resolves when the specified items reach a terminal state
+     * (completed, failed, canceled, or missing).
+     *
+     * @param localIds - Array of registered client file IDs.
+     */
+    waitFor(localIds: string[]): Promise<Array<Engine.Outcome<R>>>
+  }
 
   /**
-   * Optional custom snapshot serializer.
-   * Convert the upload state into a JSON-safe snapshot.
+   * Configuration options for constructing an upload store.
+   *
+   * @template M - Intent map type (keyed by strategy id)
+   * @template C - Cursor map type (keyed by strategy id)
+   * @template P - Purpose string union type
+   * @template R - Backend result shape
    */
-  serialize?: (state: UploadState<M, C, P, R>, version: number) => PersistedSnapshot<M, C, P>
+  export type Options<
+    M extends Contracts.Intent.Map,
+    C extends Contracts.Cursor.Map<M>,
+    P extends string,
+    R extends Contracts.Result.Base = Contracts.Result.Base,
+  > = {
+    /** Initial state to hydrate from (e.g. recovered from a persistence snapshot). */
+    initialState?: Engine.State<M, C, P, R>
+
+    /** Engine configuration (defaults applied for unspecified settings). */
+    config?: Partial<Engine.Config<P>>
+
+    /** Persistence adapter configuration (key prefix, adapters, storage handlers). */
+    persistence?: UploadPersistence.Options<M, C, P, R>
+
+    /** Your backend API implementation. */
+    api: Contracts.Api.Me<M, P, R>
+
+    /** Transport layer options for HTTP byte transfers. */
+    transport?: Transport.Options
+
+    /** Registry of available upload strategies (multipart, POST forms, simple PUTs, TUS). */
+    strategies: Contracts.Strategy.Registry<M, C, P, R>
+
+    /** Plugin modules to extend behavior (metrics, logging, analytics). */
+    plugins?: Array<Engine.Plugin<M, C, P, R>>
+
+    /** Lifecycle hooks for observing internal events. */
+    hooks?: Engine.Hooks<M, C, P, R>
+
+    /**
+     * Override to use a custom fingerprinting implementation (e.g. a custom hash).
+     */
+    fingerprint?: (file: File) => Contracts.FingerprintFile
+
+    /**
+     * Custom per-file validator called after built-in config constraints pass.
+     * Return a rejection to block the file; return null to allow it.
+     */
+    validateFile?: (file: File, purpose: P) => Contracts.Validation.Rejection | null
+
+    /**
+     * Custom error normalizer.
+     * Converts raw thrown values into a standardized Contracts.Errors.Error.
+     */
+    errorNormalizer?: (err: unknown) => Contracts.Errors.Error
+  }
+
   /**
-   * Optional custom snapshot deserializer.
-   * Convert a JSON-safe snapshot into the upload state.
+   * Tracks an in-flight upload operation.
    */
-  deserialize?: (raw: unknown, ctx: DeserializeContext<M, C, P>) => UploadState<M, C, P, R> | null
+  export type InflightUpload = {
+    /** AbortController for this upload. */
+    controller: AbortController
+    /** Whether the upload is running normally, being paused, or being canceled. */
+    mode: 'normal' | 'pause' | 'cancel'
+    /** True once the strategy's start() has been called. */
+    started: boolean
+  }
 
   /**
-   * Runtime guard for purpose strings when using the default deserializer.
+   * Internal execution context shared across store utilities, handlers, and schedulers.
    */
-  isPurpose?: (value: string) => value is P
+  export type Runtime<
+    M extends Contracts.Intent.Map,
+    C extends Contracts.Cursor.Map<M>,
+    P extends string,
+    R extends Contracts.Result.Base = Contracts.Result.Base,
+  > = {
+    /** Resolved store options with all defaults applied. */
+    opts: Options<M, C, P, R> & { config: Engine.Config<P>; transport: Transport.Options }
+    /** Current engine state. */
+    state: Engine.State<M, C, P, R>
 
-  /**
-   * Runtime guard for intent objects when using the default deserializer.
-   */
-  isIntent?: (value: unknown) => value is M[keyof M]
-}
+    /** Active state change subscribers. */
+    listeners: Set<() => void>
+    /** Typed event emitter. */
+    emitter: Emitter.TypedEmitter<Engine.EventMap<M, C, P, R>>
+    /** Reducer function. */
+    reduce: ReturnType<typeof createReducer<M, C, P, R>>
 
-/**
- * Internal record describing a currently running upload request.
- *
- * The store keeps one inflight entry per `localId` while the strategy's `start()` is running.
- * The {@link AbortController} is used to pause/cancel, while `mode` tracks which user intent
- * caused the abort so the handler can map it back into a correct state transition.
- */
-export type InflightUpload = {
-  controller: AbortController
-  mode: 'normal' | 'pause' | 'cancel'
-  started: boolean
-}
+    /** Inflight upload operations keyed by localId. */
+    inflightUploads: Map<string, InflightUpload>
+    /** Inflight intent creation requests keyed by localId. */
+    inflightIntents: Map<string, AbortController>
+    /** Inflight complete() calls keyed by localId. */
+    inflightCompletes: Map<string, AbortController>
 
-/**
- * Internal runtime container shared across dispatch, scheduler, and handlers.
- *
- * @template M - Intent map type
- * @template C - Cursor map type
- * @template P - Purpose string union type
- */
-export type StoreRuntime<
-  M extends IntentMap,
-  C extends CursorMap<M>,
-  P extends string,
-  R extends UploadResultBase = UploadResultBase,
-> = {
-  /** Store options */
-  opts: StoreOptions<M, C, P, R> & { config: UploadConfig<P>; transport: UploadTransport }
-  /** Current state */
-  state: UploadState<M, C, P, R>
+    /** Queued async side effects. */
+    effectQueue: Array<() => Promise<void>>
+    /** True while the effect queue is being drained. */
+    processingEffects: boolean
+    /** True while scheduleWork is running, preventing re-entrant calls. */
+    scheduling: boolean
 
-  /** Listeners for external events */
-  listeners: Set<() => void>
-  /** Typed event emitter */
-  emitter: TypedEmitter<UploadEventMap<M, C, P, R>>
-  /** Reducer */
-  reduce: ReturnType<typeof createReducer<M, C, P, R>>
-
-  /** In-flight uploads */
-  inflightUploads: Map<string, InflightUpload>
-  /** In-flight intents */
-  inflightIntents: Map<string, AbortController>
-  /** In-flight completes */
-  inflightCompletes: Map<string, AbortController>
-
-  /** Effect queue */
-  effectQueue: Array<() => Promise<void>>
-  /** Effect queue processing */
-  processingEffects: boolean
-  /** Effect queue scheduling */
-  scheduling: boolean
-
-  /** Notifies listeners */
-  notify: () => void
-  /** Schedules work */
-  scheduleWork: () => void
-  /** Applies an internal event */
-  applyInternal: (event: InternalEvent<M, C, P, R>) => void
-  /** Applies a command */
-  applyCommand: (cmd: UploadCommand<P>) => void
-  /** Enqueues an effect */
-  enqueueEffect: (effect: () => Promise<void>) => void
-  /** Processes effects */
-  processEffects: () => Promise<void>
-  /** Set by createUploadStore after construction; used by handlers for retries etc. */
-  dispatch: (cmd: UploadCommand<P>) => void
+    /** Notifies all state change subscribers. */
+    notify: () => void
+    /** Starts queued uploads when concurrency slots are available. */
+    scheduleWork: () => void
+    /** Applies an internal event through the reducer and notifies subscribers. */
+    applyInternal: (event: Engine.Event<M, C, P, R>) => void
+    /** Runs a command through the reducer. */
+    applyCommand: (cmd: Engine.Command<P>) => void
+    /** Adds an async side effect to the execution queue. */
+    enqueueEffect: (effect: () => Promise<void>) => void
+    /** Drains the effect queue, running each side effect in order. */
+    processEffects: () => Promise<void>
+    /** Dispatches a public command. */
+    dispatch: (cmd: Engine.Command<P>) => void
+  }
 }

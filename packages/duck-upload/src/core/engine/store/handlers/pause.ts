@@ -1,10 +1,12 @@
-import type { CursorMap, IntentMap, UploadResultBase } from '../../../contracts'
-import type { StoreRuntime } from '../store.types'
+import type { Contracts } from '../../../contracts'
+import type { Store } from '../store.types'
 
-export function handlePause<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  rt: StoreRuntime<M, C, P, R>,
-  localId: string,
-) {
+export function handlePause<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>, localId: string) {
   const inflight = rt.inflightUploads.get(localId)
   if (inflight) {
     inflight.mode = 'pause'

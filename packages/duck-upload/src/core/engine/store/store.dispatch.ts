@@ -1,9 +1,9 @@
-import type { CursorMap, IntentMap, UploadResultBase } from '../../contracts'
-import type { UploadCommand } from '../commands.types'
+import type { Contracts } from '../../contracts'
+import type { Engine } from '../engine.types'
 import { handleAddFiles } from './handlers/add-file'
 import { handleCancel } from './handlers/cancel'
 import { handlePause } from './handlers/pause'
-import type { StoreRuntime } from './store.types'
+import type { Store } from './store.types'
 
 /**
  * Dispatches a command against the runtime.
@@ -16,10 +16,12 @@ import type { StoreRuntime } from './store.types'
  * @template C - Cursor map type
  * @template P - Purpose string union type
  */
-export function dispatch<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  rt: StoreRuntime<M, C, P, R>,
-  cmd: UploadCommand<P>,
-) {
+export function dispatch<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>, cmd: Engine.Command<P>) {
   // Bulk operations
   if (cmd.type === 'startAll') {
     const purpose = cmd.purpose
@@ -54,7 +56,7 @@ export function dispatch<M extends IntentMap, C extends CursorMap<M>, P extends 
   }
 
   if (cmd.type === 'addFiles') {
-    handleAddFiles(rt, cmd.files, cmd.purpose)
+    handleAddFiles(rt, cmd.files, cmd.purpose, cmd.meta ?? {})
     return
   }
 

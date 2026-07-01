@@ -1,8 +1,8 @@
-import type { CursorMap, IntentMap, UploadResultBase } from '../../contracts'
-import type { UploadOutcome } from '../outcome.types'
+import type { Contracts } from '../../contracts'
+import type { Engine } from '../engine.types'
 import { dispatch as internalDispatch } from './store.dispatch'
 import { createStoreRuntime } from './store.runtime'
-import type { StoreOptions, StoreRuntime, UploadStore } from './store.types'
+import type { Store } from './store.types'
 
 // TODO: add option for debug mode
 
@@ -22,20 +22,20 @@ import type { StoreOptions, StoreRuntime, UploadStore } from './store.types'
  * @template P - Purpose string union type
  *
  * @param opts - Store options (config, backend API, strategies, transport, hooks)
- * @returns A configured {@link UploadStore} instance.
+ * @returns A configured {@link Store.UploadStore} instance.
  */
 export function createUploadStore<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase = UploadResultBase,
->(opts: StoreOptions<M, C, P, R>): UploadStore<M, C, P, R> {
+  R extends Contracts.Result.Base = Contracts.Result.Base,
+>(opts: Store.Options<M, C, P, R>): Store.UploadStore<M, C, P, R> {
   const rt = createStoreRuntime(opts)
 
   // Wire dispatch for handlers that need retries without import cycles.
   rt.dispatch = (cmd) => internalDispatch(rt, cmd)
 
-  const storeProxy: Pick<UploadStore<M, C, P, R>, 'on' | 'off' | 'dispatch' | 'getSnapshot'> = {
+  const storeProxy: Pick<Store.UploadStore<M, C, P, R>, 'on' | 'off' | 'dispatch' | 'getSnapshot'> = {
     on: rt.emitter.on.bind(rt.emitter),
     off: rt.emitter.off.bind(rt.emitter),
     dispatch: rt.dispatch,
@@ -47,7 +47,7 @@ export function createUploadStore<
     try {
       plugin.setup(storeProxy)
     } catch (err) {
-      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
         console.error(`[UploadEngine] Plugin "${plugin.name}" failed to setup:`, err)
       }
     }
@@ -55,11 +55,11 @@ export function createUploadStore<
 
   return {
     ...storeProxy,
-    subscribe: (listener) => {
+    subscribe: (listener: () => void) => {
       rt.listeners.add(listener)
       return () => rt.listeners.delete(listener)
     },
-    waitFor(localIds) {
+    waitFor(localIds: string[]) {
       return waitForOutcomes(rt, localIds)
     },
   }
@@ -67,20 +67,22 @@ export function createUploadStore<
 
 export * from './store.types'
 
-function waitForOutcomes<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  rt: StoreRuntime<M, C, P, R>,
-  localIds: string[],
-): Promise<Array<UploadOutcome<R>>> {
+function waitForOutcomes<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>, localIds: string[]): Promise<Array<Engine.Outcome<R>>> {
   if (localIds.length === 0) return Promise.resolve([])
 
   const pending = new Set(localIds)
-  const outcomes = new Map<string, UploadOutcome<R>>()
+  const outcomes = new Map<string, Engine.Outcome<R>>()
 
   const update = () => {
     for (const id of pending) {
       const item = rt.state.items.get(id)
       if (!item) {
-        outcomes.set(id, { localId: id, status: 'missing' })
+        outcomes.set(id, { localId: id, status: 'missing', reason: 'never-existed' })
         pending.delete(id)
         continue
       }
@@ -107,7 +109,9 @@ function waitForOutcomes<M extends IntentMap, C extends CursorMap<M>, P extends 
   update()
 
   if (pending.size === 0) {
-    return Promise.resolve(localIds.map((id) => outcomes.get(id) ?? { localId: id, status: 'missing' }))
+    return Promise.resolve(
+      localIds.map((id) => outcomes.get(id) ?? { localId: id, status: 'missing', reason: 'never-existed' }),
+    )
   }
 
   return new Promise((resolve) => {
@@ -115,7 +119,7 @@ function waitForOutcomes<M extends IntentMap, C extends CursorMap<M>, P extends 
       update()
       if (pending.size === 0) {
         rt.listeners.delete(listener)
-        resolve(localIds.map((id) => outcomes.get(id) ?? { localId: id, status: 'missing' }))
+        resolve(localIds.map((id) => outcomes.get(id) ?? { localId: id, status: 'missing', reason: 'never-existed' }))
       }
     }
     rt.listeners.add(listener)

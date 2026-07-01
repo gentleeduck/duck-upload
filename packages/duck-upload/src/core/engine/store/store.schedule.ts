@@ -1,10 +1,10 @@
-import type { CursorMap, IntentMap, UploadResultBase } from '../../contracts'
-import type { UploadItem } from '../internal-events.types'
+import type { Contracts } from '../../contracts'
+import type { Engine } from '../engine.types'
 import { createIntent } from './handlers/create-intent'
 import { finalizeUpload } from './handlers/finalize'
 import { runUpload } from './handlers/run-upload'
 import { isAutoStart } from './store.libs'
-import type { StoreRuntime } from './store.types'
+import type { Store } from './store.types'
 
 /**
  * Central scheduler that ensures the system is always making progress towards a consistent state.
@@ -15,9 +15,12 @@ import type { StoreRuntime } from './store.types'
  *
  * This function is idempotent and safe to call multiple times.
  */
-export function scheduleWork<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  rt: StoreRuntime<M, C, P, R>,
-) {
+export function scheduleWork<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>) {
   if (rt.scheduling) return
   rt.scheduling = true
   try {
@@ -36,11 +39,11 @@ export function scheduleWork<M extends IntentMap, C extends CursorMap<M>, P exte
  * {@link StoreRuntime.inflightIntents}.
  */
 export function scheduleIntentCreations<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase,
->(rt: StoreRuntime<M, C, P, R>) {
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>) {
   for (const item of rt.state.items.values()) {
     if (item.phase !== 'creating_intent') continue
     if (rt.inflightIntents.has(item.localId)) continue
@@ -54,11 +57,11 @@ export function scheduleIntentCreations<
  * Finalization runs as an async effect and is guarded by {@link StoreRuntime.inflightCompletes}.
  */
 export function scheduleCompletes<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase,
->(rt: StoreRuntime<M, C, P, R>) {
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>) {
   for (const item of rt.state.items.values()) {
     if (item.phase !== 'completing') continue
     if (rt.inflightCompletes.has(item.localId)) continue
@@ -71,11 +74,11 @@ export function scheduleCompletes<
  * Respects `maxConcurrentUploads` from config.
  */
 export function scheduleUploads<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase,
->(rt: StoreRuntime<M, C, P, R>) {
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>) {
   const maxConcurrent = Math.max(1, rt.opts.config.maxConcurrentUploads)
   const active = rt.inflightUploads.size
 
@@ -109,8 +112,11 @@ export function scheduleUploads<
   }
 }
 
-function isQueuedItem<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  item: UploadItem<M, C, P, R>,
-): item is Extract<UploadItem<M, C, P, R>, { phase: 'queued' }> {
+function isQueuedItem<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base,
+>(item: Engine.Item<M, C, P, R>): item is Extract<Engine.Item<M, C, P, R>, { phase: 'queued' }> {
   return item.phase === 'queued'
 }
