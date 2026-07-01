@@ -1,9 +1,9 @@
-import type { FileFingerprint } from '../contracts'
+import type { Contracts } from '../contracts'
 
 /**
  * Builds a lightweight fingerprint from a {@link File}.
  */
-export function computeFingerprint(file: File): FileFingerprint {
+export function computeFingerprint(file: File): Contracts.FingerprintFile {
   return {
     name: file.name,
     size: file.size,
@@ -15,6 +15,6 @@ export function computeFingerprint(file: File): FileFingerprint {
 /**
  * Compares two file fingerprints.
  */
-export function fingerprintMatches(a: FileFingerprint, b: FileFingerprint): boolean {
+export function fingerprintMatches(a: Contracts.FingerprintFile, b: Contracts.FingerprintFile): boolean {
   return a.name === b.name && a.size === b.size && a.lastModified === b.lastModified
 }

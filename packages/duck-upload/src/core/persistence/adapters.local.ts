@@ -1,15 +1,12 @@
 import { stripDangerousKeys } from '../utils/guards'
-import type { PersistenceAdapter } from './persistence.types'
+import type { UploadPersistence } from './persistence.types'
 
-export const LocalStorageAdapter: PersistenceAdapter = {
+export const LocalStorageAdapter: UploadPersistence.Adapter = {
   load(key) {
     if (typeof localStorage === 'undefined') return null
     const raw = localStorage.getItem(key)
     if (!raw) return null
     try {
-      // SEC-002: same-origin attackers can write arbitrary JSON to
-      // localStorage. Strip prototype-pollution keys before the parsed shape
-      // reaches any spread / property-copy in the hydrate path.
       return stripDangerousKeys(JSON.parse(raw))
     } catch {
       return null

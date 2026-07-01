@@ -45,7 +45,7 @@ const MAX_EMIT_DEPTH = 50
  */
 export function createTypedEmitter<E extends Record<string, unknown>>(
   onError?: EmitterErrorHandler,
-): Emitter.ITypedEmitter<E> {
+): Emitter.TypedEmitter<E> {
   const listeners: ListenerMap<E> = {}
   // Memoized iteration snapshots per event type. Invalidated on `on`/`off`.
   // Multi-listener `emit` would otherwise allocate a fresh array every call;
@@ -99,7 +99,7 @@ export function createTypedEmitter<E extends Record<string, unknown>>(
             } catch {}
             return
           }
-          if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+          if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
             console.error(`[UploadEngine] Error in event listener for "${type}":`, err)
           }
         }
@@ -107,7 +107,7 @@ export function createTypedEmitter<E extends Record<string, unknown>>(
 
       emitDepth++
       try {
-        if (emitDepth > MAX_EMIT_DEPTH && !warnedDepth && process.env.NODE_ENV !== 'production') {
+        if (emitDepth > MAX_EMIT_DEPTH && !warnedDepth && process.env['NODE_ENV'] !== 'production') {
           warnedDepth = true
           console.warn(
             `[UploadEngine] emit depth exceeded ${MAX_EMIT_DEPTH} for "${type}". ` +
@@ -121,7 +121,7 @@ export function createTypedEmitter<E extends Record<string, unknown>>(
         // most subscribers attach exactly one listener per event type.
         if (typeListeners.size === 1) {
           const [only] = typeListeners
-          dispatch(only)
+          if (only) dispatch(only)
           return
         }
 

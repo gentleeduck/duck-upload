@@ -1,5 +1,5 @@
 import { stripDangerousKeys } from '../utils/guards'
-import type { PersistenceAdapter } from './persistence.types'
+import type { UploadPersistence } from './persistence.types'
 
 const DB_NAME = 'upload-engine'
 const STORE = 'snapshots'
@@ -34,7 +34,7 @@ function txDone(tx: IDBTransaction): Promise<void> {
   })
 }
 
-export const IndexedDBAdapter: PersistenceAdapter = {
+export const IndexedDBAdapter: UploadPersistence.Adapter = {
   async load(key) {
     if (typeof indexedDB === 'undefined') return null
     const db = await openDB()
@@ -44,8 +44,6 @@ export const IndexedDBAdapter: PersistenceAdapter = {
     try {
       const value = await reqToPromise(store.get(key))
       await txDone(tx)
-      // SEC-002: defend the hydrate path from prototype-pollution payloads
-      // smuggled in via same-origin scripts or compromised browser storage.
       return value === undefined || value === null ? null : stripDangerousKeys(value)
     } catch {
       try {

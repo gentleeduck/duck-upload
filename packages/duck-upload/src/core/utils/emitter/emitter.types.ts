@@ -1,23 +1,26 @@
-/**
- * Minimal typed event emitter interface.
- *
- * Use this to expose strongly-typed events from your store.
- *
- * @typeParam E - Event map (`eventName -> payload`).
- */
-export type TypedEmitter<E extends Record<string, unknown>> = {
+export namespace Emitter {
   /**
-   * Subscribe to an event.
-   * @returns Unsubscribe function.
+   * Minimal typed event emitter interface.
+   *
+   * Use this to expose strongly-typed events from your store.
+   *
+   * @typeParam E - Event map (`eventName -> payload`).
    */
-  on<K extends keyof E & string>(type: K, cb: (payload: E[K]) => void): () => void
+  export type TypedEmitter<E extends Record<string, unknown>> = {
+    /**
+     * Subscribe to an event.
+     * @returns Unsubscribe function.
+     */
+    on<K extends keyof E & string>(type: K, cb: (payload: E[K]) => void): () => void
 
-  /**
-   * Unsubscribe from an event.
-   * @returns Unsubscribe function.
-   */
-  off<K extends keyof E & string>(type: K, cb: (payload: E[K]) => void): () => void
+    /**
+     * Unsubscribe from an event.
+     */
+    off<K extends keyof E & string>(type: K, cb: (payload: E[K]) => void): void
 
-  /** Emit an event to all listeners. */
-  emit<K extends keyof E & string>(type: K, payload: E[K]): void
+    /** Emit an event to all listeners. */
+    emit<K extends keyof E & string>(type: K, payload: E[K]): void
+  }
+
+  export type ErrorHandler = (type: string, error: unknown, cb: (...args: any[]) => void) => void
 }

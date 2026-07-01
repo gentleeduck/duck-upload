@@ -1,4 +1,4 @@
-import type { PersistenceAdapter } from './persistence.types'
+import type { UploadPersistence } from './persistence.types'
 
 /**
  * Create an in-memory {@link PersistenceAdapter} backed by a fresh `Map`.
@@ -13,7 +13,7 @@ import type { PersistenceAdapter } from './persistence.types'
  * createUploadStore({ persistence: { adapter, key: 'tenant-a' } })
  * ```
  */
-export function createMemoryAdapter(): PersistenceAdapter {
+export function createMemoryAdapter(): UploadPersistence.Adapter {
   const store = new Map<string, unknown>()
   return {
     load(key) {
@@ -28,12 +28,4 @@ export function createMemoryAdapter(): PersistenceAdapter {
   }
 }
 
-/**
- * Backwards-compatible singleton — every import shares one `Map`.
- *
- * @deprecated Use {@link createMemoryAdapter} instead. The shared
- * singleton leaks snapshot state between engine instances and is
- * unsafe for multi-tenant deployments (SEC-008). Kept for callers
- * that have not yet migrated.
- */
-export const MemoryAdapter: PersistenceAdapter = createMemoryAdapter()
+export const MemoryAdapter = createMemoryAdapter()
