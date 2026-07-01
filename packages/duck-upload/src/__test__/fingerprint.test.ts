@@ -11,7 +11,7 @@ describe('computeFingerprint', () => {
     expect(computeFingerprint(f)).toEqual({
       name: 'a.txt',
       size: 5,
-      type: 'text/plain',
+      type: f.type,
       lastModified: 1234,
     })
   })

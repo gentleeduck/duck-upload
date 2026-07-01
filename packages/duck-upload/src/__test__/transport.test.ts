@@ -89,7 +89,7 @@ describe('createXHRTransport.put', () => {
       headers: { 'x-foo': 'bar' },
     })
 
-    const xhr = MockXHR.instances[0]
+    const xhr = MockXHR.instances[0]!
     expect(xhr.method).toBe('PUT')
     expect(xhr.url).toBe('https://example.com/part')
     expect(xhr.headers['x-foo']).toBe('bar')
@@ -104,7 +104,7 @@ describe('createXHRTransport.put', () => {
     const ctl = new AbortController()
     const promise = t.put({ url: 'https://example.com/part', body: new Blob(['x']), signal: ctl.signal })
 
-    const xhr = MockXHR.instances[0]
+    const xhr = MockXHR.instances[0]!
     xhr.fireSuccess(503)
     await expect(promise).rejects.toThrow(/status 503/)
   })
@@ -114,7 +114,7 @@ describe('createXHRTransport.put', () => {
     const ctl = new AbortController()
     const promise = t.put({ url: 'https://example.com/part', body: new Blob(['x']), signal: ctl.signal })
 
-    const xhr = MockXHR.instances[0]
+    const xhr = MockXHR.instances[0]!
     xhr.fireError(0)
     await expect(promise).rejects.toThrow(/CORS/)
   })
@@ -148,7 +148,7 @@ describe('createXHRTransport.put', () => {
       onProgress,
     })
 
-    const xhr = MockXHR.instances[0]
+    const xhr = MockXHR.instances[0]!
     xhr.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 } as ProgressEvent)
     expect(onProgress).toHaveBeenCalledWith(5, 10)
 
@@ -169,7 +169,7 @@ describe('createXHRTransport.postForm', () => {
       signal: ctl.signal,
     })
 
-    const xhr = MockXHR.instances[0]
+    const xhr = MockXHR.instances[0]!
     expect(xhr.method).toBe('POST')
     expect(xhr.body).toBeInstanceOf(FormData)
     const form = xhr.body as FormData

@@ -141,7 +141,6 @@ describe('calculateFileChecksum', () => {
     expect(ha).not.toBe(hb)
   })
 
-  // SEC-007/018: cap is now a *skip* threshold, not a strategy switch.
   test('file at the threshold uses arrayBuffer() (sub-cap path)', async () => {
     const bytes = new Uint8Array(64)
     for (let i = 0; i < bytes.length; i++) bytes[i] = i

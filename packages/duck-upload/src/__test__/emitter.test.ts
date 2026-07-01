@@ -59,15 +59,15 @@ describe('createTypedEmitter', () => {
     const e = createTypedEmitter<Events>()
     const a: number[] = []
     const b: number[] = []
-    e.on('foo', (p) => a.push(p.x))
-    e.on('foo', (p) => b.push(p.x))
+    e.on('foo', (p: any) => a.push(p.x))
+    e.on('foo', (p: any) => b.push(p.x))
 
     for (let i = 0; i < 5; i++) e.emit('foo', { x: i })
     expect(a).toEqual([0, 1, 2, 3, 4])
     expect(b).toEqual([0, 1, 2, 3, 4])
 
     const c: number[] = []
-    e.on('foo', (p) => c.push(p.x))
+    e.on('foo', (p: any) => c.push(p.x))
     e.emit('foo', { x: 99 })
     expect(c).toEqual([99])
     expect(a).toEqual([0, 1, 2, 3, 4, 99])
@@ -76,7 +76,7 @@ describe('createTypedEmitter', () => {
   test('off() with a non-subscribed callback is a no-op', () => {
     const e = createTypedEmitter<Events>()
     const tracker: number[] = []
-    e.on('foo', (p) => tracker.push(p.x))
+    e.on('foo', (p: any) => tracker.push(p.x))
     const unrelated = (p: { x: number }) => tracker.push(-p.x)
     expect(() => e.off('foo', unrelated)).not.toThrow()
     e.emit('foo', { x: 7 })

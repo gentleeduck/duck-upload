@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
-import type { UploadState } from '../core/engine/reducer'
+import type { Engine } from '../core/engine/engine.types'
 import { createMemoryAdapter, MemoryAdapter } from '../core/persistence'
 import { deserializeSnapshot, serializeSnapshot } from '../core/persistence/persistence'
-import type { PersistedSnapshot } from '../core/persistence/persistence.types'
+import type { UploadPersistence } from '../core/persistence/persistence.types'
 
 type Intents = { post: { strategy: 'post'; fileId: string; url: string } }
 type Cursors = { post: { offset: number } }
@@ -22,7 +22,7 @@ const hasStrategy = (s: string) => s === 'post'
 
 describe('serializeSnapshot', () => {
   test('skips items without intents and terminal states', () => {
-    const state: UploadState<Intents, Cursors, Purpose, Result> = {
+    const state: Engine.State<Intents, Cursors, Purpose, Result> = {
       items: new Map([
         [
           'a',
@@ -33,6 +33,8 @@ describe('serializeSnapshot', () => {
             fingerprint: { name: 'a', size: 1, type: 't', lastModified: 0 },
             file: new File(['a'], 'a'),
             createdAt: 0,
+            steps: [],
+            meta: {},
           },
         ],
         [
@@ -48,6 +50,8 @@ describe('serializeSnapshot', () => {
             result: { fileId: 'b', key: 'k/b' },
             completedAt: 0,
             createdAt: 0,
+            steps: [],
+            meta: {},
           },
         ],
         [
@@ -63,6 +67,8 @@ describe('serializeSnapshot', () => {
             progress: { uploadedBytes: 5, totalBytes: 10, pct: 50 },
             createdAt: 0,
             cursor: { strategy: 'post', value: { offset: 5 } },
+            steps: [],
+            meta: {},
           },
         ],
       ]),
@@ -76,7 +82,7 @@ describe('serializeSnapshot', () => {
 
 describe('deserializeSnapshot', () => {
   test('restores resumable items into the paused phase', () => {
-    const snap: PersistedSnapshot<Intents, Cursors, Purpose> = {
+    const snap: UploadPersistence.Snapshot<Intents, Cursors, Purpose> = {
       version: 1,
       createdAt: 100,
       items: {
@@ -107,7 +113,7 @@ describe('deserializeSnapshot', () => {
   })
 
   test('drops items missing a cursor', () => {
-    const snap: PersistedSnapshot<Intents, Cursors, Purpose> = {
+    const snap: UploadPersistence.Snapshot<Intents, Cursors, Purpose> = {
       version: 1,
       createdAt: 100,
       items: {
@@ -129,13 +135,13 @@ describe('deserializeSnapshot', () => {
   })
 
   test('returns null without guards', () => {
-    const snap: PersistedSnapshot<Intents, Cursors, Purpose> = { version: 1, createdAt: 0, items: {} }
+    const snap: UploadPersistence.Snapshot<Intents, Cursors, Purpose> = { version: 1, createdAt: 0, items: {} }
     const out = deserializeSnapshot<Intents, Cursors, Purpose, Result>(snap, { hasStrategy })
     expect(out).toBeNull()
   })
 
   test('accepts snapshots and ignores unrecognized version when not enforced', () => {
-    const snap: PersistedSnapshot<Intents, Cursors, Purpose> = { version: 1, createdAt: 0, items: {} }
+    const snap: UploadPersistence.Snapshot<Intents, Cursors, Purpose> = { version: 1, createdAt: 0, items: {} }
     const out = deserializeSnapshot<Intents, Cursors, Purpose, Result>(snap, {
       isPurpose,
       isIntent,

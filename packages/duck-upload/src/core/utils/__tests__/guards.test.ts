@@ -45,7 +45,7 @@ describe('stripDangerousKeys', () => {
   test('does not pollute Object.prototype', () => {
     const raw = JSON.parse('{"__proto__":{"polluted":true}}')
     stripDangerousKeys(raw)
-    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined()
   })
 
   test('leaves exotic objects (Date, Map) untouched', () => {
@@ -53,9 +53,9 @@ describe('stripDangerousKeys', () => {
     const m = new Map([['k', 1]])
     const raw = { d, m, v: 1 } as Record<string, unknown>
     const out = stripDangerousKeys(raw) as Record<string, unknown>
-    expect(out.d).toBe(d)
-    expect(out.m).toBe(m)
-    expect(out.v).toBe(1)
+    expect(out['d']).toBe(d)
+    expect(out['m']).toBe(m)
+    expect(out['v']).toBe(1)
   })
 
   test('returns primitives and null unchanged', () => {

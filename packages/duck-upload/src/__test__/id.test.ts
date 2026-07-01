@@ -43,7 +43,7 @@ describe('generateId — fallback path (no crypto.randomUUID)', () => {
   test('falls back to getRandomValues and still produces a v4-shaped UUID', () => {
     const fakeCrypto = {
       // Simulate a runtime that lacks randomUUID but has getRandomValues.
-      getRandomValues: (arr: Uint8Array) => originalCrypto!.getRandomValues(arr),
+      getRandomValues: (arr: any) => originalCrypto!.getRandomValues(arr),
     } as unknown as Crypto
     Object.defineProperty(globalThis, 'crypto', {
       value: fakeCrypto,

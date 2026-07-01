@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import type { UploadTransport } from '../../../core/contracts'
+import type { Transport } from '../../../core'
 import { __resetMultipartWarningsForTests, multipartStrategy, validatePartUrl } from '../index'
 
 describe('validatePartUrl', () => {
@@ -160,8 +160,8 @@ describe('multipartStrategy — happy path', () => {
   function makeCtx(opts: { signPartUrl: string; fileSize?: number }) {
     const size = opts.fileSize ?? 8
     const file = new File([new Uint8Array(size)], 'a.bin')
-    const transport: Pick<UploadTransport, 'put' | 'postForm' | 'patch'> = {
-      put: vi.fn(async (_args: Parameters<UploadTransport['put']>[0]) => ({ etag: 'etag-1' })),
+    const transport: Pick<Transport.Options, 'put' | 'postForm' | 'patch'> = {
+      put: vi.fn(async (_args: Parameters<Transport.Options['put']>[0]) => ({ etag: 'etag-1' })),
       postForm: vi.fn(async () => ({})),
       patch: vi.fn(async () => ({})),
     }
@@ -177,7 +177,7 @@ describe('multipartStrategy — happy path', () => {
         partCount: 1,
       },
       signal: new AbortController().signal,
-      transport: transport as UploadTransport,
+      transport: transport,
       api: {
         createIntent: vi.fn(),
         complete: vi.fn(),
@@ -197,8 +197,8 @@ describe('multipartStrategy — happy path', () => {
 
   test('signed https://upload.example.com URL flows through to transport.put', async () => {
     const { ctx, transport } = makeCtx({ signPartUrl: 'https://upload.example.com/parts/3' })
-    const strat = multipartStrategy({ allowedHosts: ['upload.example.com'] })
-    await strat.start(ctx as unknown as Parameters<typeof strat.start>[0])
+    const start = multipartStrategy({ allowedHosts: ['upload.example.com'] })
+    await start.start(ctx as unknown as Parameters<typeof start.start>[0])
     expect(transport.put).toHaveBeenCalledTimes(1)
     const callArgs = (transport.put as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as { url: string }
     expect(callArgs.url).toBe('https://upload.example.com/parts/3')
@@ -206,24 +206,24 @@ describe('multipartStrategy — happy path', () => {
 
   test('file:// signed URL is rejected before reaching transport.put', async () => {
     const { ctx, transport } = makeCtx({ signPartUrl: 'file:///etc/passwd' })
-    const strat = multipartStrategy({ allowedHosts: ['upload.example.com'] })
-    await expect(strat.start(ctx as unknown as Parameters<typeof strat.start>[0])).rejects.toThrow(/forbidden protocol/)
+    const start = multipartStrategy({ allowedHosts: ['upload.example.com'] })
+    await expect(start.start(ctx as unknown as Parameters<typeof start.start>[0])).rejects.toThrow(/forbidden protocol/)
     expect(transport.put).not.toHaveBeenCalled()
   })
 
   test('private-host signed URL is rejected when allowPrivateHosts is false', async () => {
     const { ctx, transport } = makeCtx({ signPartUrl: 'http://127.0.0.1/upload' })
-    const strat = multipartStrategy({})
+    const start = multipartStrategy({})
     // suppress the one-time warn
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    await expect(strat.start(ctx as unknown as Parameters<typeof strat.start>[0])).rejects.toThrow(/private\/loopback/)
+    await expect(start.start(ctx as unknown as Parameters<typeof start.start>[0])).rejects.toThrow(/private\/loopback/)
     expect(transport.put).not.toHaveBeenCalled()
   })
 
   test('private-host signed URL is accepted when allowPrivateHosts is true', async () => {
     const { ctx, transport } = makeCtx({ signPartUrl: 'http://127.0.0.1/upload' })
-    const strat = multipartStrategy({ allowPrivateHosts: true, allowedHosts: ['127.0.0.1'] })
-    await strat.start(ctx as unknown as Parameters<typeof strat.start>[0])
+    const start = multipartStrategy({ allowPrivateHosts: true, allowedHosts: ['127.0.0.1'] })
+    await start.start(ctx as unknown as Parameters<typeof start.start>[0])
     expect(transport.put).toHaveBeenCalledTimes(1)
   })
 })

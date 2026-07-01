@@ -1,11 +1,3 @@
-/**
- * SEC-003 — filename-tainted error messages.
- *
- * Asserts that (a) the `UploadEngineError` class carries a static `message`
- * and stashes the filename on `context`, and (b) the three engine handlers
- * route the filename through structured context rather than interpolating it
- * into the rendered message.
- */
 import { describe, expect, test } from 'vitest'
 import { UploadEngineError } from '../errors'
 
@@ -21,7 +13,7 @@ describe('UploadEngineError', () => {
 
   test('context.filename carries the raw filename intact', () => {
     const err = new UploadEngineError('upload_failed', { context: { filename: MALICIOUS_FILENAME } })
-    expect(err.context?.filename).toBe(MALICIOUS_FILENAME)
+    expect(err.context?.['filename']).toBe(MALICIOUS_FILENAME)
   })
 
   test('is an instance of Error and UploadEngineError; code is preserved', () => {
@@ -59,6 +51,102 @@ describe('engine handlers — SEC-003 inverse assertion', () => {
     }
     expect(error.message).not.toContain(MALICIOUS_FILENAME)
     expect(error.message).not.toContain('<img')
-    expect(error.context.filename).toBe(MALICIOUS_FILENAME)
+    expect(error.context['filename']).toBe(MALICIOUS_FILENAME)
+  })
+})
+
+import {
+  UploadAbortError,
+  UploadAuthError,
+  UploadHttpError,
+  UploadNetworkError,
+  UploadRateLimitError,
+  UploadServerError,
+  UploadStrategyMissingError,
+  UploadTimeoutError,
+  UploadUnknownError,
+  UploadValidationError,
+} from '../errors'
+
+describe('UploadEngineError subclasses', () => {
+  test('UploadValidationError', () => {
+    const reason = { code: 'empty_file' as const }
+    const err = new UploadValidationError(reason)
+    expect(err).toBeInstanceOf(UploadEngineError)
+    expect(err.code).toBe('validation_failed')
+    expect(err.reason).toBe(reason)
+    expect(err.retryable).toBe(false)
+  })
+
+  test('UploadStrategyMissingError', () => {
+    const err = new UploadStrategyMissingError('custom')
+    expect(err).toBeInstanceOf(UploadEngineError)
+    expect(err.code).toBe('strategy_missing')
+    expect(err.strategy).toBe('custom')
+    expect(err.retryable).toBe(false)
+  })
+
+  test('UploadAbortError', () => {
+    const err = new UploadAbortError('pause')
+    expect(err).toBeInstanceOf(UploadEngineError)
+    expect(err.code).toBe('aborted')
+    expect(err.reason).toBe('pause')
+    expect(err.retryable).toBe(false)
+  })
+
+  test('UploadNetworkError', () => {
+    const err = new UploadNetworkError()
+    expect(err).toBeInstanceOf(UploadEngineError)
+    expect(err.code).toBe('network')
+    expect(err.retryable).toBe(true)
+  })
+
+  test('UploadHttpError', () => {
+    const err = new UploadHttpError(500, 'Internal Server Error', { statusText: 'Server Error' })
+    expect(err).toBeInstanceOf(UploadEngineError)
+    expect(err.code).toBe('http')
+    expect(err.status).toBe(500)
+    expect(err.statusText).toBe('Server Error')
+    expect(err.retryable).toBe(true)
+
+    const err400 = new UploadHttpError(400, 'Bad Request')
+    expect(err400.retryable).toBe(false)
+  })
+
+  test('UploadTimeoutError', () => {
+    const err = new UploadTimeoutError()
+    expect(err).toBeInstanceOf(UploadEngineError)
+    expect(err.code).toBe('timeout')
+    expect(err.retryable).toBe(true)
+  })
+
+  test('UploadAuthError', () => {
+    const err = new UploadAuthError()
+    expect(err).toBeInstanceOf(UploadEngineError)
+    expect(err.code).toBe('auth')
+    expect(err.retryable).toBe(false)
+  })
+
+  test('UploadRateLimitError', () => {
+    const err = new UploadRateLimitError('Too many requests', { retryAfterMs: 5000 })
+    expect(err).toBeInstanceOf(UploadEngineError)
+    expect(err.code).toBe('rate_limit')
+    expect(err.retryAfterMs).toBe(5000)
+    expect(err.retryable).toBe(true)
+  })
+
+  test('UploadServerError', () => {
+    const err = new UploadServerError('DB Error', { serverCode: 'DB_ERROR' })
+    expect(err).toBeInstanceOf(UploadEngineError)
+    expect(err.code).toBe('server')
+    expect(err.serverCode).toBe('DB_ERROR')
+    expect(err.retryable).toBe(true)
+  })
+
+  test('UploadUnknownError', () => {
+    const err = new UploadUnknownError('Something exploded')
+    expect(err).toBeInstanceOf(UploadEngineError)
+    expect(err.code).toBe('unknown')
+    expect(err.retryable).toBe(false)
   })
 })

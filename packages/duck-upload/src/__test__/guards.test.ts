@@ -21,8 +21,6 @@ describe('isRecord', () => {
     expect(isRecord(true)).toBe(false)
   })
 
-  // SEC-002: isRecord now rejects arrays and other non-plain objects so that
-  // hydrate paths cannot spread foreign shapes into runtime state.
   test('arrays are rejected', () => {
     expect(isRecord([])).toBe(false)
     expect(isRecord([1, 2, 3])).toBe(false)
