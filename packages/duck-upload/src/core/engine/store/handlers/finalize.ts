@@ -1,15 +1,16 @@
-import type { CursorMap, IntentMap, UploadError, UploadResultBase } from '../../../contracts'
-import { hasIntent, normalizeError, retryDecision, sleep } from '../store.libs'
-import type { StoreRuntime } from '../store.types'
+import type { Contracts } from '../../../contracts'
+import type { UploadError } from '../../../errors'
+import { buildApiContext, hasIntent, normalizeError, retryDecision, sleep } from '../store.libs'
+import type { Store } from '../store.types'
 
 export async function finalizeUpload<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase,
->(rt: StoreRuntime<M, C, P, R>, localId: string) {
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>, localId: string) {
   const item = rt.state.items.get(localId)
-  if (!item || item.phase !== 'completing') return
+  if (item?.phase !== 'completing') return
   if (rt.inflightCompletes.has(localId)) return
 
   const controller = new AbortController()
@@ -18,12 +19,22 @@ export async function finalizeUpload<
   try {
     // Final commit step (backend should verify upload, then mark/commit it).
     // Strategy-specific API calls (multipart/tus) must happen inside the strategy itself.
-    const result = await rt.opts.api.complete({ fileId: item.intent.fileId }, { signal: controller.signal })
+    const result = await rt.opts.api.complete(
+      {
+        fileId: item.intent.fileId,
+        filename: item.fingerprint.name,
+        contentType: item.file.type || 'application/octet-stream',
+        size: item.fingerprint.size,
+        ...(item.fingerprint.checksum !== undefined ? { checksum: item.fingerprint.checksum } : {}),
+        attempt: item.attempt ?? 1,
+      },
+      buildApiContext(item, { signal: controller.signal }) as Contracts.Api.CompleteContext<P, M>,
+    )
     rt.inflightCompletes.delete(localId)
 
     // Item might have been canceled
     const current = rt.state.items.get(localId)
-    if (!current || current.phase !== 'completing') return
+    if (current?.phase !== 'completing') return
 
     rt.applyInternal({ type: 'complete.ok', localId, result })
   } catch (err: unknown) {
@@ -34,9 +45,6 @@ export async function finalizeUpload<
     const error = normalizeError(err, rt.opts.errorNormalizer)
 
     const itemForContext = rt.state.items.get(localId)
-    // SEC-003: do not interpolate the attacker-controlled filename / fileId
-    // into the `message`. Surface them via the structured `context` field;
-    // consumers MUST escape `context.*` before HTML rendering.
     const errorWithContext: UploadError = itemForContext
       ? {
           ...error,

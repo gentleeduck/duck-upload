@@ -1,17 +1,19 @@
-import type { AnyCursor, CursorMap, IntentMap, UploadError, UploadResultBase } from '../../../contracts'
+import type { Contracts } from '../../../contracts'
+import type { UploadError } from '../../../errors'
+import { UploadStrategyMissingError } from '../../../errors'
 import { hasCursor, hasFile, hasIntent, normalizeError, retryDecision, sleep } from '../store.libs'
-import type { StoreRuntime } from '../store.types'
+import type { Store } from '../store.types'
 
 export async function runUpload<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase,
->(rt: StoreRuntime<M, C, P, R>, localId: string) {
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>, localId: string) {
   const item = rt.state.items.get(localId)
 
   // State moved on (or never valid) — drop any stale inflight entry.
-  if (!item || item.phase !== 'uploading' || !hasIntent(item)) {
+  if (item?.phase !== 'uploading' || !hasIntent(item)) {
     rt.inflightUploads.delete(localId)
     return
   }
@@ -33,11 +35,13 @@ export async function runUpload<
     rt.applyInternal({ type: 'canceled', localId, canceledAt: Date.now() })
   }
 
-  const applyPaused = (cursor: AnyCursor<C>) => {
+  const applyPaused = (cursor: Contracts.Cursor.Any<C>) => {
     const current = rt.state.items.get(localId)
     if (!current || current.phase === 'paused') return
     rt.applyInternal({ type: 'paused', localId, cursor, pausedAt: Date.now() })
   }
+
+  const strategyId = item.intent.strategy
 
   // Paused/canceled before the request begins: short-circuit to the right terminal state.
   if (controller.signal.aborted) {
@@ -45,13 +49,10 @@ export async function runUpload<
 
     if (inflight.mode === 'pause') {
       const cur = rt.state.items.get(localId)
-      let strategy: (keyof M & string) | undefined
-      if (item && hasIntent(item)) {
-        strategy = item.intent.strategy
-      }
 
       const cursor =
-        (cur && hasCursor(cur) ? cur.cursor : undefined) || (strategy ? { strategy, value: undefined } : undefined)
+        (cur && hasCursor(cur) ? cur.cursor : undefined) ||
+        ({ strategy: strategyId, value: undefined } as Contracts.Cursor.Any<C>)
 
       if (cursor) applyPaused(cursor)
       return
@@ -65,16 +66,15 @@ export async function runUpload<
     return
   }
 
-  const strategyId = item.intent.strategy
   if (!rt.opts.strategies.has(strategyId)) {
     rt.inflightUploads.delete(localId)
-    const error: UploadError = {
-      code: 'strategy_missing',
-      message: `Strategy not found: ${strategyId}`,
-      strategy: String(strategyId),
+    const error = new UploadStrategyMissingError(String(strategyId))
+    rt.applyInternal({
+      type: 'upload.failed',
+      localId,
+      error,
       retryable: false,
-    }
-    rt.applyInternal({ type: 'upload.failed', localId, error, retryable: false })
+    })
     return
   }
 
@@ -82,13 +82,13 @@ export async function runUpload<
 
   if (!strategy) {
     rt.inflightUploads.delete(localId)
-    const error: UploadError = {
-      code: 'strategy_missing',
-      message: `Strategy not found: ${item.intent.strategy}`,
-      strategy: String(item.intent.strategy),
+    const error = new UploadStrategyMissingError(String(item.intent.strategy))
+    rt.applyInternal({
+      type: 'upload.failed',
+      localId,
+      error,
       retryable: false,
-    }
-    rt.applyInternal({ type: 'upload.failed', localId, error, retryable: false })
+    })
     return
   }
 
@@ -98,11 +98,19 @@ export async function runUpload<
 
   try {
     await strategy.start({
+      localId,
+      purpose: item.purpose,
       file: item.file,
       intent: item.intent,
       signal: controller.signal,
       transport: rt.opts.transport,
       api: rt.opts.api,
+      fingerprint: item.fingerprint,
+      attempt: item.attempt ?? 1,
+      createdAt: item.createdAt,
+      steps: item.steps,
+      meta: item.meta,
+      lastError: [...item.steps].reverse().find((s) => s.error)?.error,
 
       readCursor: () => {
         const cur = rt.state.items.get(localId)
@@ -112,7 +120,7 @@ export async function runUpload<
       },
 
       persistCursor: (cursorValue) => {
-        const tagged: AnyCursor<C> = { strategy: strategyId, value: cursorValue }
+        const tagged = { strategy: strategyId, value: cursorValue } as Contracts.Cursor.Any<C>
         rt.applyInternal({ type: 'cursor.updated', localId, cursor: tagged })
       },
 
@@ -141,7 +149,9 @@ export async function runUpload<
       // Paused after strategy returned: reducer requires a cursor — synthesize an
       // empty one if the strategy never persisted progress.
       const cur = rt.state.items.get(localId)
-      const cursor = (cur && hasCursor(cur) ? cur.cursor : undefined) || { strategy: strategyId, value: undefined }
+      const cursor =
+        (cur && hasCursor(cur) ? cur.cursor : undefined) ||
+        ({ strategy: strategyId, value: undefined } as Contracts.Cursor.Any<C>)
       applyPaused(cursor)
       return
     }
@@ -154,7 +164,9 @@ export async function runUpload<
     if (controller.signal.aborted) {
       if (inflight?.mode === 'pause') {
         const cur = rt.state.items.get(localId)
-        const cursor = (cur && hasCursor(cur) ? cur.cursor : undefined) || { strategy: strategyId, value: undefined }
+        const cursor =
+          (cur && hasCursor(cur) ? cur.cursor : undefined) ||
+          ({ strategy: strategyId, value: undefined } as Contracts.Cursor.Any<C>)
         applyPaused(cursor)
         return
       }
@@ -171,8 +183,6 @@ export async function runUpload<
 
     const error = normalizeError(err, rt.opts.errorNormalizer)
     const itemForContext = rt.state.items.get(localId)
-    // SEC-003: filename and other tainted strings go on `context`, never the
-    // `message`. Consumers MUST escape `context.*` before HTML rendering.
     const errorWithContext: UploadError = itemForContext
       ? {
           ...error,

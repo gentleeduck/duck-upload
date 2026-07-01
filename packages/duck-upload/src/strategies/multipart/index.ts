@@ -4,37 +4,74 @@
  * persists ETags in the cursor and skips already-completed sessions.
  */
 
-import type { CursorMap, IntentMap, UploadResultBase, UploadStrategy } from '../../core/contracts'
+import type { Contracts } from '../../core'
+import { UploadEngineError } from '../../core'
 import { sleep } from '../../core/utils/async'
 
 const DEFAULT_MAX_PART_CONCURRENCY = 4
 
 /**
- * Configuration for {@link multipartStrategy}.
- *
- * Security note: the per-part URL returned by `signPart` is fed straight to
- * the transport. A compromised backend or MITM can return a `file://`,
- * `javascript:`, or private-network URL. Configure {@link allowedHosts}
- * (preferred) or leave {@link allowPrivateHosts} at its default `false` to
- * block loopback/private addresses.
+ * Namespace containing types and interfaces specific to the S3/MinIO multipart upload strategy.
  */
-export type MultipartStrategyConfig = {
-  maxPartConcurrency?: number
-  /**
-   * Optional case-insensitive allow-list of host names (with optional port,
-   * e.g. `upload.example.com:8443`). When set, every signed part URL must
-   * match a listed host or it is rejected.
-   */
-  allowedHosts?: string[]
-  /**
-   * When `true`, allow private-network IP literals (loopback, RFC1918,
-   * link-local, etc.) in signed part URLs. Defaults to `false`.
-   */
-  allowPrivateHosts?: boolean
-}
-
 export namespace MultipartStrategy {
-  export type IConfig = MultipartStrategyConfig
+  /**
+   * Configuration options for the multipart upload strategy.
+   */
+  export type Config = {
+    /** Maximum concurrent HTTP PUT part uploads. Defaults to 4. */
+    maxPartConcurrency?: number
+    /**
+     * Optional case-insensitive list of trusted hosts (with optional port, e.g. `upload.example.com`).
+     * When specified, every signed part URL must match one of the listed hosts.
+     */
+    allowedHosts?: string[]
+    /**
+     * When `true`, allows private network IP addresses (loopback, link-local, RFC1918) in signed part URLs.
+     * Defaults to `false`.
+     */
+    allowPrivateHosts?: boolean
+  }
+
+  /**
+   * Intent payload detailing part sizing and active upload session IDs returned by backends.
+   */
+  export type Intent = {
+    /** Discriminant matching strategy configuration registry keys. */
+    strategy: 'multipart'
+    /** Unique database identifier for the file resource. */
+    fileId: string
+    /** Active multipart session ID returned by S3/GCS. */
+    uploadId: string
+    /** Chunk size in bytes for each part slice (typically 5MB minimum). */
+    partSize: number
+    /** Total count of parts predicted for this file size. */
+    partCount: number
+
+    /** Optional array of pre-generated URLs and headers for each part (if signed up front). */
+    parts?: Array<{
+      partNumber: number
+      url: string
+      headers?: Record<string, string>
+    }>
+  }
+
+  /**
+   * Persisted resume state for multipart strategy uploads.
+   */
+  export type Cursor = {
+    /** List of completed parts. */
+    done: Array<{
+      partNumber: number
+      etag: string
+      size: number
+    }>
+
+    /**
+     * True if the backend assembled the parts.
+     * Prevents repeating completeMultipart calls on subsequent resume attempts.
+     */
+    completed?: true
+  }
 }
 
 let warnedMissingAllowedHosts = false
@@ -60,7 +97,9 @@ export function __resetMultipartWarningsForTests(): void {
 function hexTailToDottedQuad(tail: string): string | null {
   const m = /^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(tail)
   if (!m) return null
+  // biome-ignore lint/style/noNonNullAssertion: both capture groups present when regex matches
   const hi = parseInt(m[1]!, 16)
+  // biome-ignore lint/style/noNonNullAssertion: both capture groups present when regex matches
   const lo = parseInt(m[2]!, 16)
   if (!Number.isFinite(hi) || !Number.isFinite(lo)) return null
   if (hi < 0 || hi > 0xffff || lo < 0 || lo > 0xffff) return null
@@ -159,6 +198,7 @@ function isPrivateHost(host: string): boolean {
       const tail = lower.startsWith('0064:') ? lower.slice(10) : lower.slice(8)
       if (tail.includes('.')) {
         const v4match = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(tail)
+        // biome-ignore lint/style/noNonNullAssertion: capture group 1 always present when regex matches
         if (v4match) return isPrivateHost(v4match[1]!)
       }
       const groups = tail.split(':').filter((g) => g.length > 0)
@@ -186,89 +226,85 @@ export function validatePartUrl(
   opts: { allowedHosts?: string[]; allowPrivateHosts?: boolean } = {},
 ): void {
   if (typeof rawUrl !== 'string' || rawUrl.length === 0) {
-    throw new Error('multipart.signPart returned an invalid URL (empty or non-string)')
+    throw new UploadEngineError('validation_failed', {
+      message: 'multipart.signPart returned an invalid URL (empty or non-string)',
+    })
   }
 
   // Reject path-traversal segments in the raw input. `new URL` normalizes them
   // away, so check before parsing.
   if (rawUrl.includes('..')) {
-    throw new Error('multipart.signPart URL contains forbidden ".." segment')
+    throw new UploadEngineError('validation_failed', {
+      message: 'multipart.signPart URL contains forbidden ".." segment',
+    })
   }
 
   let parsed: URL
   try {
     parsed = new URL(rawUrl)
   } catch {
-    throw new Error('multipart.signPart returned a malformed URL')
+    throw new UploadEngineError('validation_failed', { message: 'multipart.signPart returned a malformed URL' })
   }
 
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error(`multipart.signPart URL has forbidden protocol "${parsed.protocol}"`)
+    throw new UploadEngineError('validation_failed', {
+      message: `multipart.signPart URL has forbidden protocol "${parsed.protocol}"`,
+    })
   }
 
   if (opts.allowedHosts && opts.allowedHosts.length > 0) {
     const host = parsed.host.toLowerCase()
     const list = opts.allowedHosts.map((h) => h.toLowerCase())
     if (!list.includes(host)) {
-      throw new Error('multipart.signPart URL host is not in the configured allow-list')
+      throw new UploadEngineError('validation_failed', {
+        message: 'multipart.signPart URL host is not in the configured allow-list',
+      })
     }
   } else if (!warnedMissingAllowedHosts) {
     warnedMissingAllowedHosts = true
     console.warn(
       '[duck-upload] multipartStrategy: no `allowedHosts` configured. Signed part URLs will be host-unrestricted. ' +
-        'Set MultipartStrategy.IConfig.allowedHosts to lock the upload host.',
+        'Set MultipartStrategy.Config.allowedHosts to lock the upload host.',
     )
   }
 
   if (!opts.allowPrivateHosts) {
     // Hostname strips an IPv6 bracket already; pass raw host so we can detect bracketed v6 forms too.
     if (isPrivateHost(parsed.hostname)) {
-      throw new Error('multipart.signPart URL points to a private/loopback host')
+      throw new UploadEngineError('validation_failed', {
+        message: 'multipart.signPart URL points to a private/loopback host',
+      })
     }
   }
 }
 
-export type MultipartIntent = {
-  strategy: 'multipart'
-  fileId: string
-  uploadId: string
-  partSize: number
-  partCount: number
-
-  // Optional legacy mode: backend might provide all urls up front
-  parts?: Array<{
-    partNumber: number
-    url: string
-    headers?: Record<string, string>
-  }>
-}
-
-export type MultipartCursor = {
-  done: Array<{
-    partNumber: number
-    etag: string
-    size: number
-  }>
-
-  /**
-   * Marks that the multipart session was completed on the backend (parts assembled).
-   * This prevents re-sending completeMultipart on resume.
-   */
-  completed?: true
-}
+// types moved to MultipartStrategy namespace above
 
 function isAbort(err: unknown) {
   return err instanceof Error && (err.name === 'AbortError' || /abort/i.test(err.message))
 }
 
+/**
+ * S3/GCS-compatible Resumable Multipart Upload Strategy.
+ *
+ * Slices files into chunks, uploads them concurrently using S3 PUT requests,
+ * and completes the upload on the backend once all chunks are transferred.
+ *
+ * @example
+ * ```ts
+ * const registry = createStrategyRegistry([
+ *   multipartStrategy({ maxPartConcurrency: 4 })
+ * ]);
+ * ```
+ */
 export function multipartStrategy<
-  M extends IntentMap & { multipart: MultipartIntent },
-  C extends CursorMap<M> & { multipart?: MultipartCursor },
+  M extends Contracts.Intent.Map & { multipart: MultipartStrategy.Intent },
+  C extends Contracts.Cursor.Map<M> & { multipart?: MultipartStrategy.Cursor },
   P extends string = string,
-  R extends UploadResultBase = UploadResultBase,
->(opts?: MultipartStrategyConfig): UploadStrategy<M, C, P, R, 'multipart'> {
+  R extends Contracts.Result.Base = Contracts.Result.Base,
+>(opts?: MultipartStrategy.Config): Contracts.Strategy.Me<M, C, P, R, 'multipart'> {
   const maxPartConcurrency = Math.max(1, opts?.maxPartConcurrency ?? DEFAULT_MAX_PART_CONCURRENCY)
-  const allowedHosts = opts?.allowedHosts
+  const allowedHosts = opts?.allowedHosts ?? []
   const allowPrivateHosts = opts?.allowPrivateHosts === true
 
   return {
@@ -326,14 +362,27 @@ export function multipartStrategy<
         if (fromIntent) return fromIntent
 
         if (!ctx.api.multipart?.signPart) {
-          throw new Error(
-            'multipart.signPart is missing in UploadApi. Implement it to call your backend sign-part endpoint.',
-          )
+          throw new UploadEngineError('validation_failed', {
+            message:
+              'multipart.signPart is missing in UploadApi. Implement it to call your backend sign-part endpoint.',
+          })
         }
 
         const out = await ctx.api.multipart.signPart(
-          { fileId: intent.fileId, uploadId: intent.uploadId, partNumber },
-          { signal: ctx.signal },
+          { fileId: intent.fileId, uploadId: intent.uploadId, partNumber, attempt: ctx.attempt },
+          {
+            localId: ctx.localId,
+            purpose: ctx.purpose,
+            file: ctx.file,
+            intent: ctx.intent,
+            signal: ctx.signal,
+            fingerprint: ctx.fingerprint,
+            attempt: ctx.attempt,
+            createdAt: ctx.createdAt,
+            steps: ctx.steps,
+            meta: ctx.meta,
+            lastError: ctx.lastError,
+          },
         )
 
         return { partNumber, url: out.url, headers: out.headers }
@@ -350,15 +399,12 @@ export function multipartStrategy<
 
           const signed = await getSignedPart(p.partNumber)
 
-          // SEC-001: validate the per-part URL before handing it to the
-          // transport. A compromised backend can otherwise pivot the browser
-          // to `file://`, `javascript:`, or a private-network host.
           validatePartUrl(signed.url, { allowedHosts, allowPrivateHosts })
 
           const res = await ctx.transport.put({
             url: signed.url,
             body: blob,
-            headers: signed.headers,
+            headers: signed.headers ?? {},
             signal: ctx.signal,
             onProgress: (loaded) => {
               inflightBytes.set(p.partNumber, loaded)
@@ -370,15 +416,16 @@ export function multipartStrategy<
 
           const etag = res.etag
           if (!etag) {
-            throw new Error(
-              'Missing ETag from upload part response. Ensure MinIO/S3 CORS exposes ETag (Access-Control-Expose-Headers: ETag).',
-            )
+            throw new UploadEngineError('upload_failed', {
+              message:
+                'Missing ETag from upload part response. Ensure MinIO/S3 CORS exposes ETag (Access-Control-Expose-Headers: ETag).',
+            })
           }
 
           finishedBytes += size
           done.set(p.partNumber, { etag, size })
 
-          const snapshot: MultipartCursor = {
+          const snapshot: MultipartStrategy.Cursor = {
             done: Array.from(done.entries())
               .map(([partNumber, v]) => ({ partNumber, etag: v.etag, size: v.size }))
               .sort((a, b) => a.partNumber - b.partNumber),
@@ -434,9 +481,10 @@ export function multipartStrategy<
       async function completeMultipart() {
         if (alreadyCompleted) return
         if (!ctx.api.multipart?.completeMultipart) {
-          throw new Error(
-            'multipart.completeMultipart is missing in UploadApi. Implement it to call your backend complete endpoint.',
-          )
+          throw new UploadEngineError('validation_failed', {
+            message:
+              'multipart.completeMultipart is missing in UploadApi. Implement it to call your backend complete endpoint.',
+          })
         }
 
         const parts = Array.from(done.entries())
@@ -444,16 +492,30 @@ export function multipartStrategy<
           .sort((a, b) => a.partNumber - b.partNumber)
 
         if (parts.length !== totalParts) {
-          throw new Error(`Cannot complete multipart: expected ${totalParts} parts, got ${parts.length}`)
+          throw new UploadEngineError('complete_failed', {
+            message: `Cannot complete multipart: expected ${totalParts} parts, got ${parts.length}`,
+          })
         }
 
         await ctx.api.multipart.completeMultipart(
           { fileId: intent.fileId, uploadId: intent.uploadId, parts },
-          { signal: ctx.signal },
+          {
+            localId: ctx.localId,
+            purpose: ctx.purpose,
+            file: ctx.file,
+            intent: ctx.intent,
+            signal: ctx.signal,
+            fingerprint: ctx.fingerprint,
+            attempt: ctx.attempt,
+            createdAt: ctx.createdAt,
+            steps: ctx.steps,
+            meta: ctx.meta,
+            lastError: ctx.lastError,
+          },
         )
 
         // Persist `completed: true` so resume after this point does not re-call `completeMultipart`.
-        const snapshot: MultipartCursor = {
+        const snapshot: MultipartStrategy.Cursor = {
           done: Array.from(done.entries())
             .map(([partNumber, v]) => ({ partNumber, etag: v.etag, size: v.size }))
             .sort((a, b) => a.partNumber - b.partNumber),

@@ -1,9 +1,8 @@
-import type { AnyCursor, AnyIntent, CursorMap, IntentMap, UploadResultBase } from '../contracts'
-import type { UploadItem } from '../engine/internal-events.types'
-import type { UploadState } from '../engine/reducer'
+import type { Contracts } from '../contracts'
+import type { Engine } from '../engine/engine.types'
 import { hasCursor, hasIntent } from '../engine/store/store.libs'
 import { isRecord } from '../utils/guards'
-import type { PersistedSnapshot, PersistedUploadItem } from './persistence.types'
+import type { UploadPersistence } from './persistence.types'
 
 /**
  * Serializes the current upload state into a JSON-safe structure.
@@ -11,23 +10,21 @@ import type { PersistedSnapshot, PersistedUploadItem } from './persistence.types
  * that can be resumed cleanly.
  */
 export function serializeSnapshot<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase,
->(state: UploadState<M, C, P, R>, version: number): PersistedSnapshot<M, C, P> {
-  const items: Record<string, PersistedUploadItem<M, C, P>> = {}
+  R extends Contracts.Result.Base,
+>(state: Engine.State<M, C, P, R>, version: number): UploadPersistence.Snapshot<M, C, P> {
+  const items: Record<string, UploadPersistence.PersistedItem<M, C, P>> = {}
 
   for (const item of state.items.values()) {
     if (!hasIntent(item)) continue
 
     // Do not persist terminal items. Persistence is for resuming and recovery, not history.
-    if (
-      (item.phase as string) === 'completed' ||
-      (item.phase as string) === 'canceled' ||
-      (item.phase as string) === 'error'
-    )
+    const phase = item.phase as string
+    if (phase === 'completed' || phase === 'canceled' || phase === 'error') {
       continue
+    }
 
     const cursor = hasCursor(item) ? item.cursor : undefined
 
@@ -40,7 +37,7 @@ export function serializeSnapshot<
           }
         : undefined
 
-    const persisted: PersistedUploadItem<M, C, P> = {
+    const persisted: UploadPersistence.PersistedItem<M, C, P> = {
       id: item.localId,
       purpose: item.purpose,
       status: item.phase,
@@ -51,7 +48,7 @@ export function serializeSnapshot<
         lastModified: item.fingerprint.lastModified,
         checksum: item.fingerprint.checksum,
       },
-      intent: item.intent,
+      intent: item.intent as Contracts.Intent.Any<M>,
       cursor,
       progress,
     }
@@ -71,22 +68,15 @@ export function serializeSnapshot<
  *   with `file` left undefined. Your UI can ask the user to rebind the file.
  */
 export function deserializeSnapshot<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase,
->(
-  raw: unknown,
-  opts: {
-    isPurpose?: (value: string) => value is P
-    isIntent?: (value: unknown) => value is M[keyof M]
-    hasStrategy: (value: string) => boolean
-  },
-): UploadState<M, C, P, R> | null {
-  if (!opts.isPurpose || !opts.isIntent) return null
+  R extends Contracts.Result.Base,
+>(raw: unknown, opts: UploadPersistence.DeserializeContext<M, P>): Engine.State<M, C, P, R> | null {
+  if (!opts.isPurpose || !opts.isIntent || !opts.hasStrategy) return null
   if (!isPersistedSnapshot(raw)) return null
 
-  const items = new Map<string, UploadItem<M, C, P, R>>()
+  const items = new Map<string, Engine.Item<M, C, P, R>>()
 
   for (const value of Object.values(raw.items)) {
     const parsed = parsePersistedItem(value)
@@ -95,7 +85,9 @@ export function deserializeSnapshot<
     if (!opts.isPurpose(parsed.purpose)) continue
     if (!opts.isIntent(parsed.intent)) continue
 
-    const strategy = parsed.intent.strategy
+    const intentObj = parsed.intent
+    if (!isRecord(intentObj)) continue
+    const strategy = intentObj.strategy
     if (typeof strategy !== 'string' || !opts.hasStrategy(strategy)) continue
 
     if (!parsed.cursor || !isCursorForRegistry<C>(parsed.cursor, opts.hasStrategy)) continue
@@ -113,7 +105,7 @@ export function deserializeSnapshot<
     items.set(parsed.id, {
       phase: 'paused',
       localId: parsed.id,
-      purpose: parsed.purpose,
+      purpose: parsed.purpose as P,
       fingerprint: {
         name: parsed.file.name,
         size: parsed.file.size,
@@ -121,54 +113,60 @@ export function deserializeSnapshot<
         lastModified: parsed.file.lastModified,
         checksum: parsed.file.checksum,
       },
-      intent: parsed.intent as AnyIntent<M>,
+      intent: parsed.intent as Contracts.Intent.Any<M>,
       cursor: parsed.cursor,
       progress: { uploadedBytes, totalBytes, pct },
       pausedAt: Date.now(),
       createdAt: raw.createdAt ?? Date.now(),
       file: undefined,
-    } as UploadItem<M, C, P, R>)
+      steps: [],
+      meta: {},
+    } as Engine.Item<M, C, P, R>)
   }
 
   return { items }
 }
 
-function isPersistedSnapshot(value: unknown): value is PersistedSnapshot<unknown, unknown, string> {
+function isPersistedSnapshot(
+  value: unknown,
+): value is UploadPersistence.Snapshot<Contracts.Intent.Map, Contracts.Cursor.Map<Contracts.Intent.Map>, string> {
   if (!isRecord(value)) return false
-  if (typeof value.version !== 'number') return false
-  if (typeof value.createdAt !== 'number') return false
-  return isRecord(value.items)
+  if (typeof value['version'] !== 'number') return false
+  if (typeof value['createdAt'] !== 'number') return false
+  return isRecord(value['items'])
 }
 
 function parsePersistedItem(value: unknown): {
   id: string
   purpose: string
   status: string
-  file: { name: string; size: number; type: string; lastModified: number; checksum?: string }
+  file: { name: string; size: number; type: string; lastModified: number; checksum?: string | undefined }
   intent: unknown
-  cursor?: unknown
-  progress?: { uploadedBytes: number; totalBytes: number; pct?: number }
+  cursor?: Contracts.Cursor.Any<Contracts.Cursor.Map<Contracts.Intent.Map>> | undefined
+  progress?: { uploadedBytes: number; totalBytes: number; pct?: number | undefined } | undefined
 } | null {
   if (!isRecord(value)) return null
 
-  const id = typeof value.id === 'string' ? value.id : null
-  const purpose = typeof value.purpose === 'string' ? value.purpose : null
-  const status = typeof value.status === 'string' ? value.status : null
-  const intent = value.intent
+  const id = typeof value['id'] === 'string' ? value['id'] : null
+  const purpose = typeof value['purpose'] === 'string' ? value['purpose'] : null
+  const status = typeof value['status'] === 'string' ? value['status'] : null
+  const intent = value['intent']
 
   if (!id || !purpose || !status) return null
 
-  if (!isRecord(value.file)) return null
+  const fileObj = value['file']
+  if (!isRecord(fileObj)) return null
 
-  const name = typeof value.file.name === 'string' ? value.file.name : null
-  const size = typeof value.file.size === 'number' ? value.file.size : null
-  const type = typeof value.file.type === 'string' ? value.file.type : null
-  const lastModified = typeof value.file.lastModified === 'number' ? value.file.lastModified : null
-  const checksum = typeof value.file.checksum === 'string' ? value.file.checksum : undefined
+  const name = typeof fileObj['name'] === 'string' ? fileObj['name'] : null
+  const size = typeof fileObj['size'] === 'number' ? fileObj['size'] : null
+  const type = typeof fileObj['type'] === 'string' ? fileObj['type'] : null
+  const lastModified = typeof fileObj['lastModified'] === 'number' ? fileObj['lastModified'] : null
+  const checksum = typeof fileObj['checksum'] === 'string' ? fileObj['checksum'] : undefined
 
   if (!name || size === null || !type || lastModified === null) return null
 
-  const progress = parseProgress(value.progress)
+  const progress = parseProgress(value['progress'])
+  const cursor = value['cursor'] as Contracts.Cursor.Any<Contracts.Cursor.Map<Contracts.Intent.Map>> | undefined
 
   return {
     id,
@@ -176,24 +174,27 @@ function parsePersistedItem(value: unknown): {
     status,
     file: { name, size, type, lastModified, checksum },
     intent,
-    cursor: value.cursor,
+    cursor,
     progress,
   }
 }
 
-function parseProgress(value: unknown): { uploadedBytes: number; totalBytes: number; pct?: number } | undefined {
+function parseProgress(
+  value: unknown,
+): { uploadedBytes: number; totalBytes: number; pct?: number | undefined } | undefined {
   if (!isRecord(value)) return undefined
-  if (typeof value.uploadedBytes !== 'number' || typeof value.totalBytes !== 'number') return undefined
-  const pct = typeof value.pct === 'number' ? value.pct : undefined
-  return { uploadedBytes: value.uploadedBytes, totalBytes: value.totalBytes, pct }
+  if (typeof value['uploadedBytes'] !== 'number' || typeof value['totalBytes'] !== 'number') return undefined
+  const pct = typeof value['pct'] === 'number' ? value['pct'] : undefined
+  return { uploadedBytes: value['uploadedBytes'] as number, totalBytes: value['totalBytes'] as number, pct }
 }
 
 function isCursorForRegistry<C extends Record<string, unknown>>(
   value: unknown,
   hasStrategy: (value: string) => boolean,
-): value is AnyCursor<C> {
+): value is Contracts.Cursor.Any<C> {
   if (!isRecord(value)) return false
-  if (typeof value.strategy !== 'string') return false
-  if (!hasStrategy(value.strategy)) return false
+  const strategy = value['strategy']
+  if (typeof strategy !== 'string') return false
+  if (!hasStrategy(strategy)) return false
   return true
 }

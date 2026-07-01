@@ -1,19 +1,19 @@
-import type { CursorMap, FileFingerprint, IntentMap, UploadResultBase } from '../../../contracts'
+import type { Contracts } from '../../../contracts'
 import { generateId } from '../../../utils/id'
 import { validateFile, validateFileList, validateMimeSignature } from '../../validation'
-import { calculateFileChecksum, computeFingerprint } from '../store.libs'
-import type { StoreRuntime } from '../store.types'
+import { calculateFileChecksum, computeFingerprint, tryDedupeByChecksum } from '../store.libs'
+import type { Store } from '../store.types'
 
 /**
  * Sync: validate + insert. Async (queued): checksum, dedupe lookup,
  * and the final validation transition.
  */
 export function handleAddFiles<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase,
->(rt: StoreRuntime<M, C, P, R>, files: File[], purpose: P) {
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>, files: File[], purpose: P, meta: Record<string, unknown> = {}) {
   const existingCount = Array.from(rt.state.items.values()).filter(
     (item) => item.purpose === purpose && item.phase !== 'canceled',
   ).length
@@ -25,13 +25,20 @@ export function handleAddFiles<
   }
 
   const now = Date.now()
-  const toAdd: Array<{ localId: string; purpose: P; file: File; fingerprint: FileFingerprint; createdAt: number }> = []
+  const toAdd: Array<{
+    localId: string
+    purpose: P
+    file: File
+    fingerprint: Contracts.FingerprintFile
+    createdAt: number
+    meta: Record<string, unknown>
+  }> = []
 
   for (const file of valid) {
     const localId = generateId()
     const fingerprint = (rt.opts.fingerprint ?? computeFingerprint)(file)
 
-    toAdd.push({ localId, purpose, file, fingerprint, createdAt: now })
+    toAdd.push({ localId, purpose, file, fingerprint, createdAt: now, meta })
 
     rt.enqueueEffect(async () => {
       let checksum: string | undefined
@@ -48,28 +55,14 @@ export function handleAddFiles<
         }
       } catch (err) {
         // Checksum failure is non-fatal — continue without dedupe.
-        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+        if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
           console.warn('[UploadEngine] Failed to calculate checksum:', err)
         }
       }
 
       // Dedupe: skip upload entirely when the backend already has the file.
-      if (checksum && rt.opts.api.findByChecksum) {
-        try {
-          const existingFile = await rt.opts.api.findByChecksum({ checksum, purpose })
-          if (existingFile) {
-            const currentItem = rt.state.items.get(localId)
-            if (currentItem && currentItem.phase === 'validating') {
-              rt.applyInternal({ type: 'dedupe.ok', localId, result: existingFile })
-              return
-            }
-          }
-        } catch (err) {
-          // Dedupe failure is non-fatal — fall through to normal upload.
-          if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-            console.warn('[UploadEngine] Failed to check for existing file:', err)
-          }
-        }
+      if (await tryDedupeByChecksum(rt, localId, checksum, purpose, ['validating'])) {
+        return
       }
 
       const reason = rt.opts.validateFile?.(file, purpose)
@@ -85,17 +78,15 @@ export function handleAddFiles<
         return
       }
 
-      // SEC-004: magic-byte MIME sniff. In strict mode a mismatch rejects
-      // the file; otherwise a one-time-per-pair `console.warn` is emitted.
       try {
-        const mimeReason = await validateMimeSignature(file, rt.opts.config.strictMimeMatch)
+        const mimeReason = await validateMimeSignature(file, rt.opts.config.strictMimeMatch === true)
         if (mimeReason) {
           rt.applyInternal({ type: 'validation.failed', localId, reason: mimeReason })
           return
         }
       } catch (err) {
         // Sniff failure is non-fatal — fall through.
-        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+        if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
           console.warn('[UploadEngine] MIME sniff failed:', err)
         }
       }

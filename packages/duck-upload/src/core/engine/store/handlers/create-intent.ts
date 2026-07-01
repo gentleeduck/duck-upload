@@ -1,33 +1,42 @@
-import type { AnyIntent, CursorMap, IntentMap, UploadError, UploadResultBase } from '../../../contracts'
+import type { Contracts } from '../../../contracts'
+import type { UploadError } from '../../../errors'
+import { UploadValidationError } from '../../../errors'
+import { isRecord } from '../../../utils/guards'
 import { sanitizeFilename } from '../../../utils/sanitize-filename'
 import { validateIntent } from '../../validation'
-import { normalizeError, retryDecision, sleep } from '../store.libs'
-import type { StoreRuntime } from '../store.types'
+import {
+  buildApiContext,
+  normalizeError,
+  parseCreateIntentDedupeResult,
+  retryDecision,
+  sleep,
+  tryDedupeByChecksum,
+} from '../store.libs'
+import type { Store } from '../store.types'
 
 export async function createIntent<
-  M extends IntentMap,
-  C extends CursorMap<M>,
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
   P extends string,
-  R extends UploadResultBase,
->(rt: StoreRuntime<M, C, P, R>, localId: string) {
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>, localId: string) {
   const item = rt.state.items.get(localId)
-  if (!item || item.phase !== 'creating_intent') return
+  if (item?.phase !== 'creating_intent') return
   if (rt.inflightIntents.has(localId)) return
 
-  // SEC-005: sanitise the filename before it leaves the engine. The
-  // raw `file.name` may contain control chars, RTL overrides, reserved
-  // Windows names, etc. — see `sanitizeFilename` for the full pipeline.
   const sanitised = sanitizeFilename(item.file.name)
   if (!sanitised.safe) {
-    const error: UploadError = {
-      code: 'validation_failed',
-      message: 'filename rejected',
-      reason: { code: 'filename_rejected', reason: sanitised.reason },
+    const error = new UploadValidationError(
+      { code: 'filename_rejected', reason: sanitised.reason },
+      'filename rejected',
+      { context: { original: item.file.name, reason: sanitised.reason } },
+    )
+    rt.applyInternal({
+      type: 'intent.failed',
+      localId,
+      error,
       retryable: false,
-      // Tainted original lives only on `context` (SEC-003 contract).
-      context: { original: item.file.name, reason: sanitised.reason },
-    } as UploadError
-    rt.applyInternal({ type: 'intent.failed', localId, error, retryable: false })
+    })
     return
   }
 
@@ -35,37 +44,59 @@ export async function createIntent<
   rt.inflightIntents.set(localId, controller)
 
   try {
+    if (await tryDedupeByChecksum(rt, localId, item.fingerprint.checksum, item.purpose, ['creating_intent'])) {
+      return
+    }
+
+    const intentArgs: {
+      purpose: P
+      contentType: string
+      size: number
+      filename: string
+      checksum?: string
+      attempt: number
+    } = {
+      purpose: item.purpose,
+      contentType: item.file.type || 'application/octet-stream',
+      size: item.file.size,
+      filename: sanitised.normalised,
+      attempt: item.attempt ?? 1,
+    }
+    if (item.fingerprint.checksum !== undefined) {
+      intentArgs.checksum = item.fingerprint.checksum
+    }
+
     const intent = await rt.opts.api.createIntent(
-      {
-        purpose: item.purpose,
-        contentType: item.file.type || 'application/octet-stream',
-        size: item.file.size,
-        filename: sanitised.normalised,
-        checksum: item.fingerprint.checksum,
-      },
-      { signal: controller.signal },
+      intentArgs,
+      buildApiContext(item, { signal: controller.signal }) as Contracts.Api.CreateIntentContext<P, M>,
     )
 
     rt.inflightIntents.delete(localId)
 
     // Item might have been canceled while intent was creating
     const current = rt.state.items.get(localId)
-    if (!current || current.phase !== 'creating_intent') return
+    if (current?.phase !== 'creating_intent') return
 
-    // Validate intent from backend
-    const intentError = validateIntent(intent, intent.strategy)
-    if (intentError) {
-      const error: UploadError = {
-        code: 'validation_failed',
-        message: `Invalid intent from backend: ${intentError.message}`,
-        cause: intentError,
-        retryable: false,
-      }
-      rt.applyInternal({ type: 'intent.failed', localId, error, retryable: false })
+    const dedupeResult = parseCreateIntentDedupeResult<R>(intent)
+    if (dedupeResult) {
+      rt.applyInternal({ type: 'dedupe.ok', localId, result: dedupeResult })
       return
     }
 
-    rt.applyInternal({ type: 'intent.ok', localId, intent: intent as AnyIntent<M> })
+    // Validate intent from backend
+    const strategy = isRecord(intent) && typeof intent.strategy === 'string' ? intent.strategy : ''
+    const intentError = validateIntent(intent, strategy)
+    if (intentError) {
+      rt.applyInternal({
+        type: 'intent.failed',
+        localId,
+        error: intentError,
+        retryable: false,
+      })
+      return
+    }
+
+    rt.applyInternal({ type: 'intent.ok', localId, intent: intent as Contracts.Intent.Any<M> })
   } catch (err: unknown) {
     rt.inflightIntents.delete(localId)
 
@@ -75,9 +106,6 @@ export async function createIntent<
     }
 
     const error = normalizeError(err, rt.opts.errorNormalizer)
-    // SEC-003: do NOT interpolate the attacker-controlled filename into the
-    // human-readable `message`. Place it on a structured `context` field;
-    // consumers MUST escape `context.*` before any HTML rendering.
     const errorWithContext: UploadError = {
       ...error,
       context: {
@@ -88,7 +116,8 @@ export async function createIntent<
       },
     }
 
-    const decision = retryDecision(rt.opts.config, { phase: 'intent', attempt: item.attempt, error: errorWithContext })
+    const attempt = item.attempt ?? 1
+    const decision = retryDecision(rt.opts.config, { phase: 'intent', attempt, error: errorWithContext })
 
     rt.applyInternal({ type: 'intent.failed', localId, error: errorWithContext, retryable: decision.retryable })
 

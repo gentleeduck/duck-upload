@@ -1,6 +1,6 @@
-import type { CursorMap, IntentMap, UploadResultBase } from '../../../contracts'
-import { hasIntent, isMultipartIntent } from '../store.libs'
-import type { StoreRuntime } from '../store.types'
+import type { Contracts } from '../../../contracts'
+import { buildApiContext, hasIntent, isMultipartIntent } from '../store.libs'
+import type { Store } from '../store.types'
 
 /**
  * Cancels a single upload item and aborts related inflight operations.
@@ -8,10 +8,12 @@ import type { StoreRuntime } from '../store.types'
  * This function is intentionally best-effort: abort calls can throw or be unsupported,
  * and server-side multipart abort is attempted only when the adapter provides it.
  */
-export function handleCancel<M extends IntentMap, C extends CursorMap<M>, P extends string, R extends UploadResultBase>(
-  rt: StoreRuntime<M, C, P, R>,
-  localId: string,
-) {
+export function handleCancel<
+  M extends Contracts.Intent.Map,
+  C extends Contracts.Cursor.Map<M>,
+  P extends string,
+  R extends Contracts.Result.Base,
+>(rt: Store.Runtime<M, C, P, R>, localId: string) {
   const item = rt.state.items.get(localId)
 
   // Abort inflight intent
@@ -43,7 +45,10 @@ export function handleCancel<M extends IntentMap, C extends CursorMap<M>, P exte
         try {
           const abort = rt.opts.api.multipart?.abort
           if (abort) {
-            await abort({ fileId: intent.fileId, uploadId: intent.uploadId })
+            await abort(
+              { fileId: intent.fileId, uploadId: intent.uploadId },
+              buildApiContext(item) as Contracts.Api.AbortContext<P, M>,
+            )
           }
         } catch {
           // ignore
