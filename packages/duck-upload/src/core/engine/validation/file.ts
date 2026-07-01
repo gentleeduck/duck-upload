@@ -1,7 +1,11 @@
-import type { UploadConfig } from '../../client'
-import type { RejectReason } from '../../contracts'
+import type { Contracts } from '../../contracts'
+import type { Engine } from '../engine.types'
 
-export function validateFile<P extends string>(file: File, purpose: P, config: UploadConfig<P>): RejectReason | null {
+export function validateFile<P extends string>(
+  file: File,
+  purpose: P,
+  config: Engine.Config<P>,
+): Contracts.Validation.Rejection | null {
   // Get rules for this purpose, skip validation if no rules defined
   const rules = config.validation?.[purpose]
   if (!rules) return null

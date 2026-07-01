@@ -17,25 +17,24 @@ export function normalizeAbortReason(r: unknown): 'pause' | 'cancel' | 'unknown'
   }
 
   if (isRecord(r) && 'reason' in r) {
-    const v = r.reason
+    const v = r['reason']
     if (v === 'pause' || v === 'cancel') return v
   }
 
   if (isRecord(r) && 'kind' in r) {
-    const v = r.kind
+    const v = r['kind']
     if (v === 'pause' || v === 'cancel') return v
   }
 
   return 'unknown'
 }
 
-export class UploadAbortError extends Error {
-  readonly code: 'aborted' = 'aborted'
-  reason: 'pause' | 'cancel' | 'unknown'
+import { UploadAbortError as CentralAbortError } from '../../errors'
 
+export class UploadAbortError extends CentralAbortError {
   constructor(reason: unknown) {
-    super('Upload aborted')
-    this.reason = normalizeAbortReason(reason)
+    const normalized = normalizeAbortReason(reason)
+    super(normalized)
   }
 }
 

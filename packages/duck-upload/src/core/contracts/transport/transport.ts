@@ -1,12 +1,5 @@
 import { abortReason, createNetworkError, makeAbortError, parseHeaders } from './transport.libs'
-import type { UploadTransport } from './transport.types'
-
-type XhrCommonArgs = {
-  url: string
-  signal?: AbortSignal
-  headers?: Record<string, string>
-  onProgress?: (loaded: number, total: number) => void
-}
+import type { Transport } from './transport.types'
 
 function isAbsoluteHttpUrl(url: string) {
   return /^https?:\/\//i.test(url)
@@ -27,7 +20,7 @@ function xhrRequest(args: {
   headers?: Record<string, string>
   onProgress?: (loaded: number, total: number) => void
 }) {
-  return new Promise<{ headers: Record<string, string>; etag?: string }>((resolve, reject) => {
+  return new Promise<{ headers: Record<string, string>; etag?: string | undefined }>((resolve, reject) => {
     if (!args.url || typeof args.url !== 'string') {
       reject(new Error(`UploadTransport: missing url`))
       return
@@ -113,9 +106,9 @@ function xhrRequest(args: {
  * Browser-native XHR transport. Uses `XMLHttpRequest` over `fetch` because
  * `fetch` lacks cross-browser upload-progress events.
  */
-export function createXHRTransport(): UploadTransport & {
+export function createXHRTransport(): Transport.Options & {
   /** Optional PATCH for tus-style strategies. */
-  patch?: (args: XhrCommonArgs & { body: Blob | ArrayBuffer }) => Promise<{ headers: Record<string, string> }>
+  patch?: (args: Transport.XhrArgs & { body: Blob | ArrayBuffer }) => Promise<{ headers: Record<string, string> }>
 } {
   return {
     async postForm(args) {
@@ -129,7 +122,7 @@ export function createXHRTransport(): UploadTransport & {
         url: args.url,
         body: form,
         signal: args.signal,
-        onProgress: args.onProgress,
+        onProgress: args.onProgress ?? (() => {}),
       })
 
       return { headers: out.headers }
@@ -141,8 +134,8 @@ export function createXHRTransport(): UploadTransport & {
         url: args.url,
         body: args.body,
         signal: args.signal,
-        headers: args.headers,
-        onProgress: args.onProgress,
+        headers: args.headers ?? {},
+        onProgress: args.onProgress ?? (() => {}),
       })
 
       // S3 multipart needs the ETag from each part response.
@@ -154,9 +147,9 @@ export function createXHRTransport(): UploadTransport & {
         method: 'PATCH',
         url: args.url,
         body: args.body,
-        signal: args.signal,
-        headers: args.headers,
-        onProgress: args.onProgress,
+        signal: args.signal ?? new AbortController().signal,
+        headers: args.headers ?? {},
+        onProgress: args.onProgress ?? (() => {}),
       })
       return { headers: out.headers }
     },

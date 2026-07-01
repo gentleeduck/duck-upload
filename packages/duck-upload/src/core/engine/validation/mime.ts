@@ -1,4 +1,4 @@
-import type { RejectReason } from '../../contracts'
+import type { Contracts } from '../../contracts'
 import { __mimeWarnings, mimeMatches, sniffMime } from '../../utils/mime-sniff'
 
 /**
@@ -15,7 +15,10 @@ import { __mimeWarnings, mimeMatches, sniffMime } from '../../utils/mime-sniff'
  * Files smaller than 1 byte (already rejected by `validateFile` upstream)
  * resolve to `null` here for safety.
  */
-export async function validateMimeSignature(file: File, strict: boolean): Promise<RejectReason | null> {
+export async function validateMimeSignature(
+  file: File,
+  strict: boolean,
+): Promise<Contracts.Validation.Rejection | null> {
   if (file.size === 0) return null
   // 16 bytes is enough — every signature we recognise fits in 12.
   const head = await file.slice(0, 16).arrayBuffer()

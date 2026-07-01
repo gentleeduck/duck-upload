@@ -1,16 +1,25 @@
-import type { UploadConfig } from '../../client'
-import type { RejectReason } from '../../contracts'
+import type { Contracts } from '../../contracts'
+import type { Engine } from '../engine.types'
 import { validateFile } from './file'
 
+/**
+ * Validates an intent object from the backend.
+ * Ensures required fields are present and URLs are valid.
+ *
+ * @param intent - Intent object to validate
+ * @param strategy - Expected strategy type (from the intent itself)
+ *
+ * @returns {Error | null} Error if validation fails, null if valid
+ */
 export function validateFileList<P extends string>(
   files: File[],
   purpose: P,
-  config: UploadConfig<P>,
+  config: Engine.Config<P>,
   existingCount: number = 0,
-): { valid: File[]; rejected: Array<{ file: File; reason: RejectReason }> } {
+): { valid: File[]; rejected: Array<{ file: File; reason: Contracts.Validation.Rejection }> } {
   const rules = config.validation?.[purpose]
   const valid: File[] = []
-  const rejected: Array<{ file: File; reason: RejectReason }> = []
+  const rejected: Array<{ file: File; reason: Contracts.Validation.Rejection }> = []
 
   // Calculate remaining slots based on maxFiles limit
   const maxFiles = rules?.maxFiles
@@ -38,13 +47,3 @@ export function validateFileList<P extends string>(
 
   return { valid, rejected }
 }
-
-/**
- * Validates an intent object from the backend.
- * Ensures required fields are present and URLs are valid.
- *
- * @param intent - Intent object to validate
- * @param strategy - Expected strategy type (from the intent itself)
- *
- * @returns {Error | null} Error if validation fails, null if valid
- */
