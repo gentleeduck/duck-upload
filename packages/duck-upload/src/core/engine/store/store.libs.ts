@@ -56,7 +56,10 @@ export const __checksumNoticesEmitted = new Set<string>()
  * @returns hex SHA-256 digest, or `null` when `file.size > cap`.
  */
 export async function calculateFileChecksum(file: File, maxSize: number | null = null): Promise<string | null> {
-  const cap = maxSize && maxSize > 0 ? maxSize : DEFAULT_CHECKSUM_MAX_SIZE
+  // Use the caller-supplied cap only when it's a finite positive number.
+  // NaN / Infinity / 0 / negative all fall back to the conservative default.
+  const cap =
+    typeof maxSize === 'number' && Number.isFinite(maxSize) && maxSize > 0 ? maxSize : DEFAULT_CHECKSUM_MAX_SIZE
   if (file.size > cap) {
     if (!__checksumNoticesEmitted.has('skipped-oversize')) {
       __checksumNoticesEmitted.add('skipped-oversize')
@@ -85,7 +88,15 @@ export function isAutoStart<
   const v = opts.config?.autoStart
   if (v === undefined) return false
   if (Array.isArray(v)) return v.includes(purpose)
-  if (typeof v === 'function') return v(purpose)
+  if (typeof v === 'function') {
+    // Fail-closed if the user-supplied predicate throws so a buggy
+    // predicate can't stop the entire addFiles flow.
+    try {
+      return v(purpose) === true
+    } catch {
+      return false
+    }
+  }
   return false
 }
 

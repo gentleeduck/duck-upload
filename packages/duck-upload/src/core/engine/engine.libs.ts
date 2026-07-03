@@ -7,18 +7,27 @@ import {
 import type { Engine } from './engine.types'
 
 /**
+ * Clamp a numeric config field, rejecting non-finite values (NaN, Infinity)
+ * that would otherwise slip past a plain `Math.max`.
+ */
+function finitePositive(input: number | undefined, fallback: number, min = 1): number {
+  if (typeof input !== 'number' || !Number.isFinite(input)) return fallback
+  return Math.max(min, input)
+}
+
+/**
  * Normalizes user config by applying sensible defaults.
  * @author wildduck2 <https://github.com/wildduck2>
  */
 export function resolveUploadConfig<P extends string>(input?: Partial<Engine.Config<P>>): Engine.Config<P> {
   return {
-    maxConcurrentUploads: Math.max(1, input?.maxConcurrentUploads ?? DEFAULT_MAX_CONCURRENT_UPLOADS),
+    maxConcurrentUploads: finitePositive(input?.maxConcurrentUploads, DEFAULT_MAX_CONCURRENT_UPLOADS),
     autoStart: input?.autoStart,
-    progressThrottleMs: Math.max(0, input?.progressThrottleMs ?? DEFAULT_PROGRESS_THROTTLE_MS),
+    progressThrottleMs: finitePositive(input?.progressThrottleMs, DEFAULT_PROGRESS_THROTTLE_MS, 0),
     validation: input?.validation ?? {},
-    maxAttempts: Math.max(1, input?.maxAttempts ?? DEFAULT_MAX_ATTEMPTS),
+    maxAttempts: finitePositive(input?.maxAttempts, DEFAULT_MAX_ATTEMPTS),
     retryPolicy: input?.retryPolicy,
-    maxItems: Math.max(1, input?.maxItems ?? DEFAULT_MAX_ITEMS),
+    maxItems: finitePositive(input?.maxItems, DEFAULT_MAX_ITEMS),
     completedItemTTL: input?.completedItemTTL,
     strictMimeMatch: input?.strictMimeMatch ?? false,
     checksumMaxSize: input?.checksumMaxSize ?? null,

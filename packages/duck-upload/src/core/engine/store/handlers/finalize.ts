@@ -3,6 +3,10 @@ import type { UploadError } from '../../../errors'
 import { buildApiContext, hasIntent, normalizeError, retryDecision, sleep } from '../store.libs'
 import type { Store } from '../store.types'
 
+function hasContext(e: UploadError): e is UploadError & { context: Record<string, unknown> } {
+  return typeof e === 'object' && e !== null && 'context' in e && typeof e.context === 'object' && e.context !== null
+}
+
 export async function finalizeUpload<
   M extends Contracts.Intent.Map,
   C extends Contracts.Cursor.Map<M>,
@@ -49,7 +53,7 @@ export async function finalizeUpload<
       ? {
           ...error,
           context: {
-            ...((error as { context?: Record<string, unknown> }).context ?? {}),
+            ...(hasContext(error) ? error.context : {}),
             filename: itemForContext.fingerprint.name,
             fileId: (hasIntent(itemForContext) && itemForContext.intent?.fileId) ?? 'unknown',
           },

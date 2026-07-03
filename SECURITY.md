@@ -17,3 +17,9 @@ We ask security researchers to give us **90 days** to address issues before publ
 We will credit you in release notes unless you prefer to remain anonymous.
 
 Thank you for helping keep duck-upload secure.
+
+## Threat model + audit
+
+For the full STRIDE-mapped threat model see [`packages/duck-upload/THREAT-MODEL.md`](packages/duck-upload/THREAT-MODEL.md) - every defense the library ships and every assumption it makes about the operator is enumerated there.
+
+For the dependency audit see [`packages/duck-upload/AUDIT-RESULTS.md`](packages/duck-upload/AUDIT-RESULTS.md) - re-runnable via `bun audit`; current run is clean (0 advisories).

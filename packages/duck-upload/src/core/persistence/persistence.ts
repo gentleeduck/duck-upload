@@ -129,12 +129,16 @@ export function deserializeSnapshot<
   return { items }
 }
 
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v)
+}
+
 function isPersistedSnapshot(
   value: unknown,
 ): value is UploadPersistence.Snapshot<Contracts.Intent.Map, Contracts.Cursor.Map<Contracts.Intent.Map>, string> {
   if (!isRecord(value)) return false
-  if (typeof value['version'] !== 'number') return false
-  if (typeof value['createdAt'] !== 'number') return false
+  if (!isFiniteNumber(value['version'])) return false
+  if (!isFiniteNumber(value['createdAt'])) return false
   return isRecord(value['items'])
 }
 
@@ -160,12 +164,14 @@ function parsePersistedItem(value: unknown): {
   if (!isRecord(fileObj)) return null
 
   const name = typeof fileObj['name'] === 'string' ? fileObj['name'] : null
-  const size = typeof fileObj['size'] === 'number' ? fileObj['size'] : null
+  const rawSize = fileObj['size']
+  const size = isFiniteNumber(rawSize) && rawSize >= 0 ? rawSize : null
   const type = typeof fileObj['type'] === 'string' ? fileObj['type'] : null
-  const lastModified = typeof fileObj['lastModified'] === 'number' ? fileObj['lastModified'] : null
+  const rawLastModified = fileObj['lastModified']
+  const lastModified = isFiniteNumber(rawLastModified) ? rawLastModified : null
   const checksum = typeof fileObj['checksum'] === 'string' ? fileObj['checksum'] : undefined
 
-  if (!name || size === null || !type || lastModified === null) return null
+  if (!name || size === null || type === null || lastModified === null) return null
 
   const progress = parseProgress(value['progress'])
   const cursor = value['cursor'] as Contracts.Cursor.Any<Contracts.Cursor.Map<Contracts.Intent.Map>> | undefined
@@ -185,9 +191,13 @@ function parseProgress(
   value: unknown,
 ): { uploadedBytes: number; totalBytes: number; pct?: number | undefined } | undefined {
   if (!isRecord(value)) return undefined
-  if (typeof value['uploadedBytes'] !== 'number' || typeof value['totalBytes'] !== 'number') return undefined
-  const pct = typeof value['pct'] === 'number' ? value['pct'] : undefined
-  return { uploadedBytes: value['uploadedBytes'] as number, totalBytes: value['totalBytes'] as number, pct }
+  const uploadedBytes = value['uploadedBytes']
+  const totalBytes = value['totalBytes']
+  if (!isFiniteNumber(uploadedBytes) || !isFiniteNumber(totalBytes)) return undefined
+  if (uploadedBytes < 0 || totalBytes < 0) return undefined
+  const rawPct = value['pct']
+  const pct = isFiniteNumber(rawPct) ? rawPct : undefined
+  return { uploadedBytes, totalBytes, pct }
 }
 
 function isCursorForRegistry<C extends Record<string, unknown>>(
