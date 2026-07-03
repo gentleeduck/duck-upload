@@ -23,37 +23,45 @@
 
 ---
 
-Headless, framework-agnostic file-upload engine with a typed state machine, pluggable strategies, and React bindings.
+A pure-reducer core, persistence-aware and resume-after-refresh, with bounded upload
+concurrency and zero coupling to a specific backend or UI library. The engine stays
+protocol-agnostic: your backend returns an intent, the engine dispatches on its `strategy` field
+to a registered strategy that moves the bytes.
 
-Pure-reducer core, persistence-aware, resume-after-refresh, bounded effect concurrency, and zero coupling to a specific backend or UI library.
+## Install
+
+```sh
+bun add @gentleduck/upload
+# peer deps for the React bindings
+bun add react react-dom
+```
 
 ## Quick Start
 
 ```ts
 import { createUploadStore } from '@gentleduck/upload/core'
-import { createStrategyRegistry } from '@gentleduck/upload/strategies'
+import { PutStrategy, createStrategyRegistry } from '@gentleduck/upload/strategies'
 
-type Intents = { post: { strategy: 'post'; fileId: string; url: string; fields: Record<string, string> } }
-type Cursors = { post: { offset: number } }
+type Intents = { put: PutStrategy.Intent }
+type Cursors = { put?: PutStrategy.Cursor }
 type Purpose = 'attachment'
 type Result = { fileId: string; key: string }
 
 const strategies = createStrategyRegistry<Intents, Cursors, Purpose, Result>()
-strategies.set({
-  id: 'post',
-  resumable: false,
-  async start({ file, intent, transport, signal, reportProgress }) {
-    // your upload logic (PUT/POST/multipart/tus)
-    reportProgress({ uploadedBytes: file.size, totalBytes: file.size })
-  },
-})
+strategies.set(PutStrategy({ allowedHosts: ['uploads.example.com'] }))
 
 const store = createUploadStore<Intents, Cursors, Purpose, Result>({
   strategies,
   api: {
-    async createIntent({ filename }) {
-      return { strategy: 'post', fileId: filename, url: '/sign', fields: {} }
+    // Ask your backend to presign the upload.
+    async createIntent({ filename, contentType, size }) {
+      const res = await fetch('/api/sign', {
+        method: 'POST',
+        body: JSON.stringify({ filename, contentType, size }),
+      })
+      return res.json() // -> { strategy: 'put', fileId, url, headers? }
     },
+    // Finalize once the bytes are transferred.
     async complete({ fileId }) {
       return { fileId, key: `attachments/${fileId}` }
     },
@@ -64,252 +72,216 @@ const store = createUploadStore<Intents, Cursors, Purpose, Result>({
 store.dispatch({ type: 'addFiles', files, purpose: 'attachment' })
 ```
 
+The `createXHRTransport()` browser transport is installed automatically. Pass
+`transport: createFetchTransport()` to run in Node / SSR / edge / workers.
+
+## Strategies
+
+A strategy is the thin layer that turns an intent into network calls. Four ship built in;
+register the ones you need and let `createIntent` pick per file.
+
+| Strategy | Factory | Use case | Resumable |
+| --- | --- | --- | --- |
+| PUT | `PutStrategy(opts?)` | Single presigned PUT (S3 `putObject`, signed PUT) | No |
+| POST | `PostStrategy(opts?)` | Presigned `multipart/form-data` (S3 POST policy) | No |
+| Multipart | `multipartStrategy(opts?)` | Large files, concurrent parts, per-part resume | Yes |
+| tus | `TusStrategy(opts?)` | Resumable uploads over the tus protocol | Yes |
+
+```ts
+import {
+  PutStrategy,
+  PostStrategy,
+  multipartStrategy,
+  TusStrategy,
+  createStrategyRegistry,
+} from '@gentleduck/upload/strategies'
+
+const strategies = createStrategyRegistry<Intents, Cursors, Purpose, Result>()
+strategies.set(PutStrategy({ allowedHosts: ['uploads.example.com'] }))
+strategies.set(PostStrategy())
+strategies.set(multipartStrategy({ maxPartConcurrency: 4 }))
+strategies.set(TusStrategy({ allowedHosts: ['tus.example.com'] }))
+```
+
+Every backend-supplied URL (PUT / POST / multipart part / tus) runs through the `validateUploadUrl`
+SSRF guard before any byte leaves the client. Set `allowedHosts` to lock the host; keep
+`allowPrivateHosts` at its default `false` to block loopback / RFC1918 / cloud-metadata targets.
+`PutStrategy`, `PostStrategy`, and `TusStrategy` retry transient network failures
+(timeouts / 5xx / `ECONNRESET`) with exponential backoff.
+
 ## React
 
 ```tsx
-import { UploadProvider, useUploader, createUploadFactory } from '@gentleduck/upload/react'
+import {
+  UploadProvider,
+  useUploader,
+  useDropzone,
+} from '@gentleduck/upload/react'
 
-const useUploads = createUploadFactory(store)
+function Uploader() {
+  const { getRootProps, getInputProps, isDragging } = useDropzone({
+    purpose: 'attachment',
+    accept: 'image/*,.pdf',
+  })
+  const { items, dispatch } = useUploader<Intents, Cursors, Purpose, Result>()
 
-function FileList() {
-  const { items, uploading, dispatch } = useUploads()
   return (
-    <UploadProvider store={store}>
-      {items.map(item => (
-        <Row key={item.localId} item={item} onCancel={() => dispatch({ type: 'cancel', localId: item.localId })} />
+    <div {...getRootProps()} data-active={isDragging}>
+      <input {...getInputProps()} />
+      {items.map((item) => (
+        <Row
+          key={item.localId}
+          item={item}
+          onCancel={() => dispatch({ type: 'cancel', localId: item.localId })}
+        />
       ))}
-    </UploadProvider>
+    </div>
   )
 }
+
+// Wrap once so descendants can reach the store.
+<UploadProvider store={store}>
+  <Uploader />
+</UploadProvider>
 ```
 
-A full working demo lives at `packages/registry-examples/src/upload/upload-1.tsx`.
-
-## Features
-
-- **Pure reducer**  -  command/event-driven state machine; effects are isolated
-- **Typed end-to-end**  -  intents, cursors, purposes, and results are quad-generics threaded through the engine
-- **Strategy registry**  -  ship POST/multipart out of the box, add TUS or your own
-- **Resume after refresh**  -  IndexedDB / LocalStorage / Memory persistence adapters; cursor-aware re-binding
-- **Retry policy**  -  exponential backoff with attempt escalation per phase (intent / upload / complete)
-- **Bounded effect concurrency**  -  `effectConcurrency` separates side-effect parallelism from upload-byte parallelism
-- **Batched bulk dispatch**  -  `startAll` / `pauseAll` / `cancelAll` collapse into a single reducer pass and notification
-- **Rebind**  -  rebind a paused, persisted item to a fresh `File` after refresh, with fingerprint validation
-- **Plugins + hooks**  -  `onInternalEvent`, `onPersistenceError`, custom plugins
-- **No DOM coupling**  -  works in Workers, Node 22+, or the browser
-- **SSRF guard built in**  -  every backend-supplied URL (POST + multipart) runs through `validateUploadUrl` (allowlist + protocol + IPv4/IPv6 private + cloud-metadata + NAT64 + 6to4 + IPv4-mapped checks) before any byte leaves the client
-- **Filename + MIME hardening**  -  NFKC normalize, control-char strip, Windows reserved-name + 255-char + path-sep + leading-dash + trailing-dot rejection; magic-byte sniff cross-checks the claimed `file.type`
-- **NaN-safe configs**  -  every numeric option (`maxAttempts`, `maxConcurrentUploads`, timeouts, byte caps) clamps `NaN`/`Infinity`/negative back to the default; persisted snapshots reject `NaN` fields
-- **Threat model + audit**  -  STRIDE-mapped `THREAT-MODEL.md` and re-runnable `AUDIT-RESULTS.md` checked into the package
+React exports: `UploadProvider`, `useUploader`, `useUploaderActions`, `useDropzone`,
+`createUploadFactory`, `useUploadStore`, `isUploadStore` (plus the pure helpers
+`fileMatchesAccept`, `matchesAcceptToken`, `selectFiles`).
 
 ## Subpath Exports
 
 ```ts
-import { createUploadStore } from '@gentleduck/upload/core'
-import { UploadProvider, useUploader } from '@gentleduck/upload/react'
-import { createStrategyRegistry } from '@gentleduck/upload/strategies'
+import { createUploadStore, createFetchTransport } from '@gentleduck/upload/core'
+import { UploadProvider, useUploader, useDropzone } from '@gentleduck/upload/react'
+import { PutStrategy, TusStrategy, createStrategyRegistry } from '@gentleduck/upload/strategies'
 ```
+
+## Features
+
+- **Pure reducer** — command/event-driven state machine; effects are isolated.
+- **Typed end-to-end** — intents, cursors, purposes, and results are quad-generics threaded
+  through the engine (`M`, `C`, `P`, `R`).
+- **Four built-in strategies** — PUT, POST, multipart, tus — plus a registry for your own.
+- **Two transports** — `createXHRTransport()` (browser, real upload progress) and
+  `createFetchTransport()` (Node / SSR / edge / workers), with optional `get()` streaming
+  download and `head()`.
+- **Resume after refresh** — Memory / LocalStorage / IndexedDB persistence adapters; cursor-aware
+  re-binding via the `rebind` command.
+- **Retry policy** — exponential backoff with per-phase attempt escalation (intent / upload /
+  complete), overridable via `config.retryPolicy`.
+- **Bounded concurrency** — `config.maxConcurrentUploads` caps parallel uploads; queued items
+  wait for a free slot.
+- **Content dedupe, off-thread** — SHA-256 checksums hash inline for small files and
+  incrementally in a Web Worker for large ones, so `checksumMaxSize` is a boundary, not a skip —
+  big files stay deduplicated without freezing the UI.
+- **Headless React** — `useDropzone` gives drag-and-drop + file-picker prop getters with zero
+  markup or styling.
+- **SSRF guard built in** — allowlist + protocol + IPv4/IPv6 private + cloud-metadata + NAT64 +
+  6to4 + IPv4-mapped checks on every upload URL.
+- **Filename + MIME hardening** — NFKC normalize, control-char strip, Windows reserved-name +
+  255-char + path-sep rejection; magic-byte sniff cross-checks the claimed `file.type`.
+- **NaN-safe configs** — every numeric option clamps `NaN` / `Infinity` / negative to its
+  default; persisted snapshots reject `NaN` fields.
+- **No DOM coupling** — runs in Workers, Node 22+, or the browser.
+- **Threat model + audit** — STRIDE-mapped `THREAT-MODEL.md` and re-runnable `AUDIT-RESULTS.md`
+  checked into the package.
 
 ## Persistence
 
+Persistence lets a paused or in-flight upload survive a refresh: the snapshot is stored, and a
+`rebind` re-attaches a fresh `File` (validated by fingerprint) so a resumable strategy continues
+from its cursor.
+
 ```ts
-import { createIndexedDBAdapter } from '@gentleduck/upload/core'
+import { createUploadStore, IndexedDBAdapter } from '@gentleduck/upload/core'
 
 createUploadStore({
+  strategies,
+  api,
   persistence: {
     key: 'app:uploads',
     version: 1,
-    adapter: createIndexedDBAdapter(),
+    adapter: IndexedDBAdapter, // or LocalStorageAdapter / createMemoryAdapter()
     isPurpose,
     isIntent,
   },
-  hooks: { onPersistenceError: (err) => toast.error(err.message) },
-  ...
 })
 ```
 
-Use `createIndexedDBAdapter()` / `createMemoryAdapter()` factories so each store owns its own connection.
-
-Adapters throw a typed `PersistenceError` on failure (`quota_exceeded`, `unavailable`, `serialization_failed`, `transaction_failed`, `unknown`) that is routed to the optional `onPersistenceError` hook.
-
-### Cross-tab IndexedDB contract
-
-When a second tab opens the same database at a higher `persistence.version`, the existing tab's connection receives `onversionchange` and closes. The adapter resets its memoized handle so the next call reopens -- but at the OLD version. IndexedDB rejects that with `VersionError`, which the adapter surfaces as `PersistenceError('unavailable', operation, ...)`.
-
-Application policy:
-
-- Bump `persistence.version` in every tab/deployment in lockstep.
-- Treat `onPersistenceError({ code: 'unavailable' })` after a known multi-tab scenario as a signal to reload the tab. The adapter is fixed at construction; the store does not support runtime adapter swap. If you want graceful fallback to in-memory persistence, the consumer must tear the store down and reconstruct with `createMemoryAdapter()`.
-- Snapshot version mismatches at load time also surface as `PersistenceError('unavailable')` (via `deserializeSnapshot`'s `expectedVersion` fence).
-
-### Handling persistence errors
-
-```ts
-import { createIndexedDBAdapter, type PersistenceError } from '@gentleduck/upload/core'
-
-createUploadStore({
-  persistence: { key: 'app:uploads', version: 1, adapter: createIndexedDBAdapter(), isPurpose, isIntent },
-  hooks: {
-    onPersistenceError(err: PersistenceError) {
-      switch (err.code) {
-        case 'quota_exceeded':
-          toast.error('Storage full -- drop some uploads and try again.')
-          break
-        case 'unavailable':
-          // Private mode / SecurityError / no IndexedDB. Fall back to memory.
-          telemetry.warn('upload.persistence.unavailable', { op: err.operation })
-          break
-        case 'serialization_failed':
-          // Snapshot was tampered with; drop the bad key and start over.
-          adapter.clear('app:uploads').catch(() => undefined)
-          break
-        case 'transaction_failed':
-        case 'unknown':
-          telemetry.error('upload.persistence.error', { op: err.operation, message: err.message })
-          break
-      }
-    },
-  },
-  ...
-})
-```
-
-The engine never aborts uploads on a persistence error -- it continues operating in-memory. Use the hook to surface the failure to the user or to swap adapters at runtime.
-
-The hook may be sync or `async`; the engine tracks the returned promise and keeps the re-entrancy guard active until it settles, so dispatches issued inside an async hook cannot loop the failure path.
-
-## Effect concurrency and watchdog
-
-Side-effects (intent creation, finalize, checksum, retry sleep, multipart abort) run in a bounded worker pool:
-
-```ts
-createUploadStore({
-  config: {
-    effectConcurrency: 8,    // default: 8. Set to 1 for strict-sequential.
-    effectTimeoutMs: 60_000, // default: 60s per effect. 0 disables the watchdog.
-  },
-  ...
-})
-```
-
-Every effect receives an `AbortSignal`. When the watchdog fires the signal is aborted so well-behaved effects can exit cleanly. Effects that ignore the signal keep running in the background; the slot is released either way so the pool keeps draining. Retry-sleep effects that get cut short by the watchdog still dispatch the retry as long as the item is still in `error` -- the watchdog cannot strand an item permanently.
+Adapters: `IndexedDBAdapter` and `LocalStorageAdapter` (shared singletons), `MemoryAdapter`
+(shared) or `createMemoryAdapter()` (isolated per store). Bump `persistence.version` in lockstep
+across tabs/deployments; a snapshot at a different version is rejected by `deserializeSnapshot`'s
+version fence rather than loaded.
 
 ## Writing a custom strategy
 
-A strategy is the thin layer that knows how to actually move bytes from a `File` to your storage using the intent shape your backend returns. Every strategy implements one `start()` and shares the same `Strategy.ICtx` contract:
+A strategy implements one `start()` against the `Contracts.Strategy.Me` contract. `id` must equal
+the intent's `strategy` field; `resumable` is metadata for your UI. Honor `signal`, call
+`reportProgress`, and — if resumable — `persistCursor` at each safe boundary.
 
 ```ts
-import type { Strategy } from '@gentleduck/upload/core'
+import type { Contracts } from '@gentleduck/upload/core'
 
-type Intents = { tus: { strategy: 'tus'; fileId: string; uploadUrl: string } }
-type Cursors = { tus: { offset: number } }
+type Intents = { myput: { strategy: 'myput'; fileId: string; url: string } }
+type Cursors = { myput?: Record<string, never> }
 type Purpose = 'attachment'
 type Result = { fileId: string; key: string }
 
-export const tusStrategy: Strategy.IStrategy<Intents, Cursors, Purpose, Result, 'tus'> = {
-  id: 'tus',
-  resumable: true,
-  async start({ file, intent, signal, transport, readCursor, persistCursor, reportProgress }) {
-    // 1. Resume from the last persisted cursor if there is one.
-    let offset = readCursor()?.offset ?? 0
-
-    while (offset < file.size) {
-      if (signal.aborted) throw { code: 'aborted', reason: signal.reason }
-
-      const chunk = file.slice(offset, offset + 1024 * 1024)
-      const res = await transport.send({
-        url: intent.uploadUrl,
-        method: 'PATCH',
-        headers: {
-          'Upload-Offset': String(offset),
-          'Content-Type': 'application/offset+octet-stream',
-        },
-        body: chunk,
-        signal,
-        onProgress: ({ uploadedBytes }) => {
-          reportProgress({ uploadedBytes: offset + uploadedBytes, totalBytes: file.size })
-        },
-      })
-
-      offset += chunk.size
-
-      // 2. Persist resumable progress so a refresh can rebind + resume.
-      persistCursor({ offset })
-
-      if (!res.ok) throw new Error(`TUS PATCH failed: ${res.status}`)
-    }
+const myPut: Contracts.Strategy.Me<Intents, Cursors, Purpose, Result, 'myput'> = {
+  id: 'myput',
+  resumable: false,
+  async start(ctx) {
+    await ctx.transport.put({
+      url: ctx.intent.url,
+      body: ctx.file,
+      signal: ctx.signal,
+      onProgress: (uploadedBytes, totalBytes) => ctx.reportProgress({ uploadedBytes, totalBytes }),
+    })
   },
 }
+
+strategies.set(myPut)
 ```
 
-Contract:
-
-- **`id`** must match the `intent.strategy` your backend returns.
-- **`resumable`** is metadata for UIs; the engine doesn't enforce it.
-- **`start()`** is awaited; resolve normally → engine transitions to `completing`. Throw → engine routes the error through `errorNormalizer` + `retryPolicy`.
-- Honor **`signal`** -- abort cleanly when it fires (throw `{ code: 'aborted', reason: signal.reason }`).
-- Call **`reportProgress`** as often as makes sense; it is throttled by `config.progressThrottleMs`.
-- Call **`persistCursor`** at every safe resume boundary; the value is restored on the next `rebind` after refresh.
-- Use **`api`** for backend round-trips that depend on the intent (e.g. multipart `signPart` / `completeMultipart`).
-
-Register the strategy and reference it from `createIntent`:
-
-```ts
-const strategies = createStrategyRegistry<Intents, Cursors, Purpose, Result>()
-strategies.set(tusStrategy)
-```
-
-## Architecture
-
-```
-@gentleduck/upload
-├── core/
-│   ├── client/         -  Client.IUploadConfig, Client.IUploadHooks, Client.IUploadPlugin
-│   ├── contracts/      -  intents, cursors, transport, errors, strategy
-│   ├── engine/         -  reducer + commands + internal events
-│   │   └── store/      -  runtime, dispatch, scheduler, handlers
-│   ├── persistence/    -  Memory / LocalStorage / IndexedDB adapters + serializer
-│   └── utils/          -  emitter, id, fingerprint, guards, async
-├── strategies/
-│   ├── post/           -  single-PUT/POST strategy
-│   ├── multipart/      -  S3-style multipart with partSize + ETag tracking
-│   └── registry/       -  createStrategyRegistry
-└── react/              -  UploadProvider, useUploader, createUploadFactory
-```
+`start()` is awaited: resolve → the engine transitions to `completing`; throw → the error routes
+through `errorNormalizer` + `retryPolicy`. The `ctx` also carries `intent`, `api`, `readCursor`,
+`persistCursor`, `attempt`, and the injected `transport` (`put` / `postForm` / `patch` and the
+optional `get` / `head`). Use `api.multipart.signPart` / `completeMultipart` for backend
+round-trips a strategy needs mid-flight.
 
 ## Commands
 
+Dispatch via `store.dispatch(cmd)`.
+
 | Command | Purpose |
-|---|---|
+| --- | --- |
 | `addFiles` | Validate + insert; schedules checksum + intent |
 | `start` / `startAll` | Move ready items to queued (batched) |
 | `pause` / `pauseAll` | Abort inflight, persist cursor (batched) |
 | `resume` | Re-queue a paused item |
-| `cancel` / `cancelAll` | Abort everything and mark canceled (batched) |
+| `cancel` / `cancelAll` | Abort and mark canceled (batched) |
 | `retry` | Re-attempt the failed phase, bumping the attempt counter |
-| `rebind` | Re-attach a fresh `File` after refresh (validated by fingerprint) |
+| `rebind` | Re-attach a fresh `File` after refresh (fingerprint-validated) |
 | `remove` | Drop the item from state |
 
 ## Events
 
-Subscribe via `store.on(type, cb)`. Highlights:
+Subscribe via `store.on(type, cb)`; payloads are typed from the engine's event map.
 
 - `file.added`, `file.rejected`
 - `validation.ok`, `validation.failed`
 - `intent.creating`, `intent.created`, `intent.failed`
 - `upload.queued`, `upload.started`, `upload.progress`, `upload.cursor`
-- `upload.paused`, `upload.canceled`, `upload.completing`, `upload.completed`, `upload.error`
-- `rebind.ok`, `rebind.failed`
+- `upload.paused`, `upload.resumed`, `upload.canceled`
+- `upload.completing`, `upload.completed`, `upload.error`
 
 ## Bundler requirement
 
-The engine references `process.env.NODE_ENV` to gate dev-only invariant
-warnings (reducer no-op check, listener-throw fallback logging, strategy-
-overwrite warn). Vite / Webpack / Rspack / esbuild / Rollup replace this at
-build time and ship a single branch into production. Pure-ESM consumers that
-load the source directly without a bundler must polyfill
-`globalThis.process = { env: { NODE_ENV: 'production' } }` before importing
-the package, otherwise `process` is undefined at module load.
+The engine references `process.env.NODE_ENV` to gate dev-only invariant warnings. Vite / Webpack /
+Rspack / esbuild / Rollup replace this at build time and ship a single branch to production.
+Pure-ESM consumers loading the source without a bundler must set
+`globalThis.process = { env: { NODE_ENV: 'production' } }` before importing the package.
 
 ## Tests
 
@@ -317,7 +289,8 @@ the package, otherwise `process` is undefined at module load.
 bun run test
 ```
 
-Vitest suite covers the reducer state machine, the persistence layer, all utility modules, the rebind handler, and a full smoke upload through the React-less store API.
+The Vitest suite covers the reducer state machine, persistence, every strategy and transport, the
+incremental hasher, the SSRF/filename/MIME guards, and the React helpers.
 
 ## License
 

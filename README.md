@@ -5,7 +5,7 @@
 <h1 align="center">@gentleduck/upload</h1>
 
 <p align="center">
-  Resumable, strategy-based file upload engine for the browser. POST + multipart strategies, abort/resume, React bindings.
+  Resumable, strategy-based file upload engine. PUT / POST / multipart / tus strategies, abort &amp; resume, XHR + fetch transports, React bindings.
 </p>
 
 <p align="center">
@@ -32,26 +32,50 @@ bun add @gentleduck/upload
 ## Quick start
 
 ```ts
-import { createUploadEngine, PostStrategy, multipartStrategy } from '@gentleduck/upload'
+import { createUploadStore } from '@gentleduck/upload/core'
+import { PutStrategy, createStrategyRegistry } from '@gentleduck/upload/strategies'
 
-const engine = createUploadEngine({
-  strategies: [PostStrategy(), multipartStrategy()],
-  backend: { url: '/api/uploads' },
+const strategies = createStrategyRegistry()
+strategies.set(PutStrategy({ allowedHosts: ['uploads.example.com'] }))
+
+const store = createUploadStore({
+  strategies,
+  api: {
+    async createIntent({ filename, contentType, size }) {
+      const res = await fetch('/api/sign', {
+        method: 'POST',
+        body: JSON.stringify({ filename, contentType, size }),
+      })
+      return res.json() // -> { strategy: 'put', fileId, url, headers? }
+    },
+    async complete({ fileId }) {
+      return { fileId, key: `uploads/${fileId}` }
+    },
+  },
+  config: { maxConcurrentUploads: 3, autoStart: ['avatar'] },
 })
 
-await engine.upload(file, { strategy: 'multipart', purpose: 'avatar' })
+store.dispatch({ type: 'addFiles', files, purpose: 'avatar' })
 ```
 
 ### React
 
 ```tsx
-import { useUpload } from '@gentleduck/upload/react'
+import { useDropzone, useUploader } from '@gentleduck/upload/react'
 
 function Avatar() {
-  const { upload, progress, status } = useUpload({ purpose: 'avatar' })
-  return <input type="file" onChange={(e) => upload(e.target.files![0])} />
+  const { getRootProps, getInputProps } = useDropzone({ purpose: 'avatar', accept: 'image/*' })
+  const { uploading } = useUploader()
+  return (
+    <div {...getRootProps()}>
+      <input {...getInputProps()} />
+      {uploading.length > 0 && <span>uploading…</span>}
+    </div>
+  )
 }
 ```
+
+See the [package README](packages/duck-upload/README.md) for the full API.
 
 ## Workspace
 
@@ -63,16 +87,10 @@ function Avatar() {
 
 | Subpath | Target |
 | --- | --- |
-| `@gentleduck/upload` | Top-level public API |
-| `@gentleduck/upload/core` | Engine, contracts, fingerprint |
-| `@gentleduck/upload/react` | React hooks + provider |
-| `@gentleduck/upload/strategies` | `PostStrategy`, `multipartStrategy`, registry |
-
-## Apps
-
-| Path | Role |
-| --- | --- |
-| [`apps/duck-upload-docs`](apps/duck-upload-docs) | Docs site at [gentleduck.org/duck-upload](https://gentleduck.org/duck-upload) |
+| `@gentleduck/upload` | Top-level public API (core + react + strategies) |
+| `@gentleduck/upload/core` | Engine, contracts, persistence, errors, XHR + fetch transports |
+| `@gentleduck/upload/react` | React provider + hooks (`useUploader`, `useDropzone`) |
+| `@gentleduck/upload/strategies` | `PutStrategy`, `PostStrategy`, `multipartStrategy`, `TusStrategy`, registry |
 
 ## Build
 
