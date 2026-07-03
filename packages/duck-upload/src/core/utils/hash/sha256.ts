@@ -1,3 +1,5 @@
+// biome-ignore-all lint/style/noNonNullAssertion: fixed-bounds reads over Uint8/Uint32Array in the SHA-256 hot loop are always defined; asserting avoids per-read branches.
+
 /**
  * Pure-JS incremental SHA-256 over a `Blob`/`File`.
  *
