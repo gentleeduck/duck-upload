@@ -6,8 +6,8 @@
 
 import type { Contracts } from '../../core'
 import { UploadEngineError } from '../../core'
-import { sleep } from '../../core/utils/async'
 import { validateUploadUrl } from '../../core/utils/url-safety'
+import { withRetry } from '../_shared/retry'
 
 const DEFAULT_MAX_PART_CONCURRENCY = 4
 
@@ -109,10 +109,6 @@ export function validatePartUrl(
 }
 
 // types moved to MultipartStrategy namespace above
-
-function isAbort(err: unknown) {
-  return err instanceof Error && (err.name === 'AbortError' || /abort/i.test(err.message))
-}
 
 /**
  * S3/GCS-compatible Resumable Multipart Upload Strategy.
@@ -219,74 +215,57 @@ export function multipartStrategy<
         return { partNumber, url: out.url, headers: out.headers }
       }
 
-      const uploadOne = async (
-        p: { partNumber: number; start: number; end: number },
-        retryCount = 0,
-      ): Promise<void> => {
-        const maxRetries = 3
-        try {
-          const blob = ctx.file.slice(p.start, p.end)
-          const size = blob.size
+      const uploadOne = (p: { partNumber: number; start: number; end: number }): Promise<void> =>
+        withRetry(
+          async () => {
+            try {
+              const blob = ctx.file.slice(p.start, p.end)
+              const size = blob.size
 
-          const signed = await getSignedPart(p.partNumber)
+              const signed = await getSignedPart(p.partNumber)
 
-          validatePartUrl(signed.url, { allowedHosts, allowPrivateHosts })
+              validatePartUrl(signed.url, { allowedHosts, allowPrivateHosts })
 
-          const res = await ctx.transport.put({
-            url: signed.url,
-            body: blob,
-            headers: signed.headers ?? {},
-            signal: ctx.signal,
-            onProgress: (loaded) => {
-              inflightBytes.set(p.partNumber, loaded)
+              const res = await ctx.transport.put({
+                url: signed.url,
+                body: blob,
+                headers: signed.headers ?? {},
+                signal: ctx.signal,
+                onProgress: (loaded) => {
+                  inflightBytes.set(p.partNumber, loaded)
+                  report()
+                },
+              })
+
+              inflightBytes.delete(p.partNumber)
+
+              const etag = res.etag
+              if (!etag) {
+                throw new UploadEngineError('upload_failed', {
+                  message:
+                    'Missing ETag from upload part response. Ensure MinIO/S3 CORS exposes ETag (Access-Control-Expose-Headers: ETag).',
+                })
+              }
+
+              finishedBytes += size
+              done.set(p.partNumber, { etag, size })
+
+              const snapshot: MultipartStrategy.Cursor = {
+                done: Array.from(done.entries())
+                  .map(([partNumber, v]) => ({ partNumber, etag: v.etag, size: v.size }))
+                  .sort((a, b) => a.partNumber - b.partNumber),
+              }
+              ctx.persistCursor(snapshot as C['multipart'])
               report()
-            },
-          })
-
-          inflightBytes.delete(p.partNumber)
-
-          const etag = res.etag
-          if (!etag) {
-            throw new UploadEngineError('upload_failed', {
-              message:
-                'Missing ETag from upload part response. Ensure MinIO/S3 CORS exposes ETag (Access-Control-Expose-Headers: ETag).',
-            })
-          }
-
-          finishedBytes += size
-          done.set(p.partNumber, { etag, size })
-
-          const snapshot: MultipartStrategy.Cursor = {
-            done: Array.from(done.entries())
-              .map(([partNumber, v]) => ({ partNumber, etag: v.etag, size: v.size }))
-              .sort((a, b) => a.partNumber - b.partNumber),
-          }
-          ctx.persistCursor(snapshot as C['multipart'])
-          report()
-        } catch (err) {
-          inflightBytes.delete(p.partNumber)
-
-          if (ctx.signal?.aborted || isAbort(err)) throw err
-
-          // Retry transient network errors with exponential backoff.
-          if (retryCount < maxRetries) {
-            const msg = err instanceof Error ? err.message : String(err)
-            const retryable =
-              /network/i.test(msg) ||
-              /timeout/i.test(msg) ||
-              /5\d\d/.test(msg) ||
-              /ECONNRESET/i.test(msg) ||
-              /EHOSTUNREACH/i.test(msg)
-
-            if (retryable) {
-              await sleep(2 ** retryCount * 500)
-              return uploadOne(p, retryCount + 1)
+            } catch (err) {
+              // Clear this part's in-flight bytes before retry/rethrow so the
+              // progress total does not double-count a re-attempted part.
+              inflightBytes.delete(p.partNumber)
+              throw err
             }
-          }
-
-          throw err
-        }
-      }
+          },
+          { signal: ctx.signal },
+        )
 
       while (queue.length > 0 || running.size > 0) {
         while (queue.length > 0 && running.size < maxPartConcurrency) {
