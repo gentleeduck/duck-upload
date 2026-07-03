@@ -1,3 +1,5 @@
 export { isUploadStore, UploadProvider, useUploadStore } from './upload-provider'
 export type { Uploader } from './uploader.types'
+export type { UseDropzoneOptions, UseDropzoneReturn } from './use-dropzone'
+export { fileMatchesAccept, matchesAcceptToken, selectFiles, useDropzone } from './use-dropzone'
 export { createUploadFactory, useUploader, useUploaderActions } from './use-uploader'
