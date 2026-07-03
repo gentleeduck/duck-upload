@@ -46,6 +46,29 @@ export namespace Transport {
       signal: AbortSignal
       onProgress?: (u: number, t: number) => void
     }): Promise<{ headers?: Record<string, string> }>
+
+    /**
+     * Optional HTTP GET download. Streams the response so `onProgress` can
+     * report bytes as they arrive. Not every transport implements it — check
+     * for presence before calling.
+     */
+    get?(args: {
+      url: string
+      headers?: Record<string, string>
+      signal: AbortSignal
+      onProgress?: (loaded: number, total: number) => void
+    }): Promise<{ blob: Blob; status: number; headers?: Record<string, string> }>
+
+    /**
+     * Optional HTTP HEAD. Used by resumable strategies (tus) to read the
+     * server's current `Upload-Offset` before resuming. Not every transport
+     * implements it — check for presence before calling.
+     */
+    head?(args: {
+      url: string
+      headers?: Record<string, string>
+      signal: AbortSignal
+    }): Promise<{ status: number; headers: Record<string, string> }>
   }
 
   export type XhrArgs = {

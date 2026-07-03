@@ -325,6 +325,19 @@ export namespace Contracts {
           signal: AbortSignal
           onProgress?: (u: number, t: number) => void
         }): Promise<{ headers?: Record<string, string> }>
+
+        get?(args: {
+          url: string
+          headers?: Record<string, string>
+          signal: AbortSignal
+          onProgress?: (loaded: number, total: number) => void
+        }): Promise<{ blob: Blob; status: number; headers?: Record<string, string> }>
+
+        head?(args: {
+          url: string
+          headers?: Record<string, string>
+          signal: AbortSignal
+        }): Promise<{ status: number; headers: Record<string, string> }>
       }
       api: Api.Me<M, P, R>
       reportProgress: (p: { uploadedBytes: number; totalBytes: number }) => void
