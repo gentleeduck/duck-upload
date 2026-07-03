@@ -96,9 +96,11 @@ export namespace Engine {
     strictMimeMatch?: boolean | undefined
 
     /**
-     * Limit on file size in bytes up to which checksum calculations are run.
-     * Large files skip client-side checksum hash calculations to prevent freezing UI threads.
-     * Set to `null` or `undefined` for no limit.
+     * File-size boundary in bytes between the two checksum paths. At or below
+     * it, files hash inline with native Web Crypto (fastest). Above it, files
+     * hash incrementally in bounded slices — off the main thread via a Web
+     * Worker when available — so large files no longer freeze the UI and are
+     * still deduplicated. Set to `null` or `undefined` for the default (64 MiB).
      */
     checksumMaxSize?: number | null | undefined
   }

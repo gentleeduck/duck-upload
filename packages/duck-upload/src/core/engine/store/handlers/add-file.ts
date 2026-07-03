@@ -43,15 +43,12 @@ export function handleAddFiles<
     rt.enqueueEffect(async () => {
       let checksum: string | undefined
       try {
-        // `calculateFileChecksum` returns `null` when the file exceeds
-        // `checksumMaxSize`. Treat that as "no checksum available" — same
-        // path as a thrown failure, but without the warning.
-        const computed = await calculateFileChecksum(file, rt.opts.config.checksumMaxSize)
-        if (computed !== null) {
-          checksum = computed
-          const updatedFingerprint = { ...fingerprint, checksum }
-          rt.applyInternal({ type: 'fingerprint.updated', localId, fingerprint: updatedFingerprint })
-        }
+        // Hashes files of any size (small: native Web Crypto; large:
+        // incremental, off-thread when possible). Failures fall through to the
+        // catch and simply skip dedupe.
+        checksum = await calculateFileChecksum(file, rt.opts.config.checksumMaxSize)
+        const updatedFingerprint = { ...fingerprint, checksum }
+        rt.applyInternal({ type: 'fingerprint.updated', localId, fingerprint: updatedFingerprint })
       } catch (err) {
         // Checksum failure is non-fatal  continue without dedupe.
         if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {

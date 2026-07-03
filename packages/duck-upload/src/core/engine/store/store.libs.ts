@@ -3,6 +3,7 @@ import type { UploadError } from '../../errors'
 import { DEFAULT_RETRY_DELAY_BASE_MS, DEFAULT_RETRY_DELAY_MAX_MS } from '../../utils/constants'
 import { computeFingerprint, fingerprintMatches } from '../../utils/fingerprint'
 import { isRecord } from '../../utils/guards'
+import { hashBlob } from '../../utils/hash'
 import type { Engine } from '../engine.types'
 import type { Store } from './store.types'
 
@@ -31,48 +32,31 @@ export function buildApiContext<
   }
 }
 
-/** Default cap when `config.checksumMaxSize` is unset (`null`) or `0`: 64 MiB. */
-export const DEFAULT_CHECKSUM_MAX_SIZE = 64 * 1024 * 1024
-
 /**
- * Dedup set for one-time-per-session `console.info` notices, keyed by reason
- * string so each distinct notice fires once per JS realm.
- * @internal exported for tests.
+ * Default boundary between inline and incremental hashing when
+ * `config.checksumMaxSize` is unset (`null`) or `0`: 64 MiB.
  */
-export const __checksumNoticesEmitted = new Set<string>()
+export const DEFAULT_CHECKSUM_MAX_SIZE = 64 * 1024 * 1024
 
 /**
  * SHA-256 checksum of `file` for deduplication.
  *
- * When `file.size` exceeds the resolved cap the checksum is skipped and `null`
- * is returned, with no I/O performed on `file`. Hashing large files requires
- * reading the whole buffer into memory (Web Crypto has no incremental digest),
- * so the cap trades dedupe coverage for a hard memory ceiling. Operators that
- * need dedupe on large files should raise `checksumMaxSize` or compute
- * fingerprints out-of-band.
+ * `maxSize` is the inline/incremental boundary, not a skip: files at or below
+ * it are hashed with native Web Crypto (fastest), while larger files are hashed
+ * incrementally in bounded slices — off the main thread via a Web Worker when
+ * available, otherwise inline-incremental. Memory stays flat either way, so
+ * dedupe now covers files of any size.
  *
  * Pass `maxSize = 0` or omit it to use {@link DEFAULT_CHECKSUM_MAX_SIZE}.
  *
- * @returns hex SHA-256 digest, or `null` when `file.size > cap`.
+ * @returns lowercase hex SHA-256 digest.
  */
-export async function calculateFileChecksum(file: File, maxSize: number | null = null): Promise<string | null> {
-  // Use the caller-supplied cap only when it's a finite positive number.
+export async function calculateFileChecksum(file: File, maxSize: number | null = null): Promise<string> {
+  // Use the caller-supplied boundary only when it's a finite positive number.
   // NaN / Infinity / 0 / negative all fall back to the conservative default.
-  const cap =
+  const inlineMaxSize =
     typeof maxSize === 'number' && Number.isFinite(maxSize) && maxSize > 0 ? maxSize : DEFAULT_CHECKSUM_MAX_SIZE
-  if (file.size > cap) {
-    if (!__checksumNoticesEmitted.has('skipped-oversize')) {
-      __checksumNoticesEmitted.add('skipped-oversize')
-      console.info(
-        '[duck-upload] file exceeds checksumMaxSize; skipping checksum. ' +
-          'Raise `checksumMaxSize` if dedupe coverage is required on large files.',
-      )
-    }
-    return null
-  }
-  const hashBuffer = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+  return hashBlob(file, { inlineMaxSize })
 }
 
 /**

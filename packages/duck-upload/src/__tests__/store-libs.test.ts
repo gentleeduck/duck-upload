@@ -1,7 +1,6 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { resolveUploadConfig } from '../core/client'
 import {
-  __checksumNoticesEmitted,
   calculateFileChecksum,
   isAbortError,
   isMultipartIntent,
@@ -122,15 +121,18 @@ describe('isMultipartIntent', () => {
 })
 
 describe('calculateFileChecksum', () => {
-  beforeEach(() => {
-    __checksumNoticesEmitted.clear()
-  })
+  /** Reference digest via native Web Crypto for cross-checking the incremental path. */
+  async function subtleHex(bytes: Uint8Array): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', bytes as unknown as BufferSource)
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+  }
 
   test('produces a hex digest', async () => {
     const file = new File([new Uint8Array([0, 1, 2, 3])], 'a.bin')
     const h = await calculateFileChecksum(file)
-    expect(h).toMatch(/^[0-9a-f]+$/)
-    expect(h && h.length).toBeGreaterThan(0)
+    expect(h).toMatch(/^[0-9a-f]{64}$/)
   })
 
   test('different files produce different hashes', async () => {
@@ -141,62 +143,50 @@ describe('calculateFileChecksum', () => {
     expect(ha).not.toBe(hb)
   })
 
-  test('file at the threshold uses arrayBuffer() (sub-cap path)', async () => {
+  test('file at the boundary uses the inline Web Crypto path (arrayBuffer once)', async () => {
     const bytes = new Uint8Array(64)
     for (let i = 0; i < bytes.length; i++) bytes[i] = i
     const file = new File([bytes], 'cap.bin')
     const abSpy = vi.spyOn(file, 'arrayBuffer')
-    const streamSpy = vi.spyOn(file, 'stream')
-    const h = await calculateFileChecksum(file, 64) // size 64, cap 64 -> NOT above
-    expect(h).toMatch(/^[0-9a-f]+$/)
+    const h = await calculateFileChecksum(file, 64) // size 64, boundary 64 -> inline
+    expect(h).toBe(await subtleHex(bytes))
     expect(abSpy).toHaveBeenCalledTimes(1)
-    expect(streamSpy).not.toHaveBeenCalled()
   })
 
-  test('file below threshold uses arrayBuffer() and produces a digest', async () => {
+  test('file below the boundary uses the inline Web Crypto path', async () => {
     const bytes = new Uint8Array(32)
     for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 3) & 0xff
     const file = new File([bytes], 'small.bin')
     const abSpy = vi.spyOn(file, 'arrayBuffer')
-    const streamSpy = vi.spyOn(file, 'stream')
-    const h = await calculateFileChecksum(file, 64) // size 32 < cap 64
-    expect(h).toMatch(/^[0-9a-f]+$/)
+    const h = await calculateFileChecksum(file, 64) // size 32 < boundary 64
+    expect(h).toBe(await subtleHex(bytes))
     expect(abSpy).toHaveBeenCalledTimes(1)
-    expect(streamSpy).not.toHaveBeenCalled()
   })
 
-  test('file above threshold returns null and performs NO I/O on the file', async () => {
+  test('file above the boundary is hashed incrementally and matches Web Crypto', async () => {
     const bytes = new Uint8Array(128)
     for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 7) & 0xff
     const file = new File([bytes], 'big.bin')
-    const abSpy = vi.spyOn(file, 'arrayBuffer')
-    const streamSpy = vi.spyOn(file, 'stream')
-    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
-    const h = await calculateFileChecksum(file, 16) // size 128 > cap 16
-    expect(h).toBeNull()
-    expect(abSpy).not.toHaveBeenCalled()
-    expect(streamSpy).not.toHaveBeenCalled()
-    expect(infoSpy).toHaveBeenCalledTimes(1)
-    expect(String(infoSpy.mock.calls[0]?.[0] ?? '')).toMatch(/checksumMaxSize/)
-    infoSpy.mockRestore()
+    // No Worker in the test realm -> inline-incremental over slices.
+    const h = await calculateFileChecksum(file, 16) // size 128 > boundary 16
+    expect(h).toBe(await subtleHex(bytes))
   })
 
-  test('repeated above-cap calls only emit the console.info notice once', async () => {
-    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
-    for (let i = 0; i < 5; i++) {
-      const file = new File([new Uint8Array(64)], `big-${i}.bin`)
-      const h = await calculateFileChecksum(file, 8)
-      expect(h).toBeNull()
+  test('incremental path is stable across boundary/chunk splits', async () => {
+    const bytes = new Uint8Array(1000)
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 31 + 7) & 0xff
+    const file = new File([bytes], 'span.bin')
+    const expected = await subtleHex(bytes)
+    // Force incremental with several different sub-cap boundaries.
+    for (const boundary of [1, 7, 13, 64, 100]) {
+      const h = await calculateFileChecksum(file, boundary)
+      expect(h).toBe(expected)
     }
-    expect(infoSpy).toHaveBeenCalledTimes(1)
-    infoSpy.mockRestore()
   })
 
-  test('maxSize of 0 or null falls back to default cap (no skip for tiny files)', async () => {
+  test('maxSize of 0 or null falls back to the default boundary', async () => {
     const file = new File([new Uint8Array([1, 2, 3])], 'tiny.bin')
-    const streamSpy = vi.spyOn(file, 'stream')
     const h = await calculateFileChecksum(file, 0)
-    expect(h).toMatch(/^[0-9a-f]+$/)
-    expect(streamSpy).not.toHaveBeenCalled()
+    expect(h).toMatch(/^[0-9a-f]{64}$/)
   })
 })
