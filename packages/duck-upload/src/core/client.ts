@@ -1,2 +1,3 @@
 export { resolveUploadConfig } from './engine/engine.libs'
-export * from './engine/store'
+export type { Store } from './engine/store'
+export { createUploadStore } from './engine/store'

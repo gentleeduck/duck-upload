@@ -23,6 +23,7 @@ import type { Store } from './store.types'
  *
  * @param opts - Store options (config, backend API, strategies, transport, hooks)
  * @returns A configured {@link Store.UploadStore} instance.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export function createUploadStore<
   M extends Contracts.Intent.Map,
@@ -65,7 +66,7 @@ export function createUploadStore<
   }
 }
 
-export * from './store.types'
+export type { Store } from './store.types'
 
 function waitForOutcomes<
   M extends Contracts.Intent.Map,

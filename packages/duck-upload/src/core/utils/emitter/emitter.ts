@@ -1,24 +1,6 @@
 import type { Emitter } from './emitter.types'
 
 /**
- * Listener-throw callback. Re-exported alias for the canonical
- * {@link Emitter.ErrorHandler} type. Kept for backwards compatibility
- * with R30 import paths; prefer `Emitter.ErrorHandler` in new code.
- *
- * @author wildduck2 <https://github.com/wildduck2>
- */
-export type EmitterErrorHandler = Emitter.ErrorHandler
-
-/**
- * Listener registry, bucketed by event type.
- *
- * @template E Event map.
- */
-type ListenerMap<E extends Record<string, unknown>> = Partial<{
-  [K in keyof E & string]: Set<(payload: E[K]) => void>
-}>
-
-/**
  * Soft cap on nested `emit` depth. A listener that synchronously dispatches a
  * command which fires another emit is legal -- but unbounded re-entry usually
  * means a feedback loop. The cap surfaces it in dev without aborting.
@@ -44,9 +26,9 @@ const MAX_EMIT_DEPTH = 50
  * @author wildduck2 <https://github.com/wildduck2>
  */
 export function createTypedEmitter<E extends Record<string, unknown>>(
-  onError?: EmitterErrorHandler,
+  onError?: Emitter.ErrorHandler,
 ): Emitter.TypedEmitter<E> {
-  const listeners: ListenerMap<E> = {}
+  const listeners: Emitter.ListenerMap<E> = {}
   // Memoized iteration snapshots per event type. Invalidated on `on`/`off`.
   // Multi-listener `emit` would otherwise allocate a fresh array every call;
   // for progress streams that adds up to one Set + spread per progress tick.

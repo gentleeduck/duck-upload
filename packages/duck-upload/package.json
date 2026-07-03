@@ -6,6 +6,7 @@
     "access": "public"
   },
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

@@ -1,2 +1,2 @@
-export * from './emitter'
-export * from './emitter.types'
+export { createTypedEmitter } from './emitter'
+export type { Emitter } from './emitter.types'
