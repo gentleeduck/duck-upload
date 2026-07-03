@@ -44,9 +44,8 @@ export function handleAddFiles<
       let checksum: string | undefined
       try {
         // `calculateFileChecksum` returns `null` when the file exceeds
-        // `checksumMaxSize` (SEC-007/018: skip > stream). Treat that as
-        // "no checksum available" — same path as a thrown failure but
-        // without the warn.
+        // `checksumMaxSize`. Treat that as "no checksum available" — same
+        // path as a thrown failure, but without the warning.
         const computed = await calculateFileChecksum(file, rt.opts.config.checksumMaxSize)
         if (computed !== null) {
           checksum = computed
@@ -54,7 +53,7 @@ export function handleAddFiles<
           rt.applyInternal({ type: 'fingerprint.updated', localId, fingerprint: updatedFingerprint })
         }
       } catch (err) {
-        // Checksum failure is non-fatal — continue without dedupe.
+        // Checksum failure is non-fatal  continue without dedupe.
         if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
           console.warn('[UploadEngine] Failed to calculate checksum:', err)
         }
@@ -85,7 +84,7 @@ export function handleAddFiles<
           return
         }
       } catch (err) {
-        // Sniff failure is non-fatal — fall through.
+        // Sniff failure is non-fatal  fall through.
         if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
           console.warn('[UploadEngine] MIME sniff failed:', err)
         }

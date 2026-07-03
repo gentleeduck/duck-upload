@@ -12,7 +12,7 @@ export async function runUpload<
 >(rt: Store.Runtime<M, C, P, R>, localId: string) {
   const item = rt.state.items.get(localId)
 
-  // State moved on (or never valid) — drop any stale inflight entry.
+  // State moved on (or never valid)  drop any stale inflight entry.
   if (item?.phase !== 'uploading' || !hasIntent(item)) {
     rt.inflightUploads.delete(localId)
     return
@@ -146,7 +146,7 @@ export async function runUpload<
       return
     }
     if (controller.signal.aborted && inflight?.mode === 'pause') {
-      // Paused after strategy returned: reducer requires a cursor — synthesize an
+      // Paused after strategy returned: reducer requires a cursor  synthesize an
       // empty one if the strategy never persisted progress.
       const cur = rt.state.items.get(localId)
       const cursor =

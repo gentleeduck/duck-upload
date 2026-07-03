@@ -3,6 +3,7 @@
  *
  * Each sub-namespace owns one concern (Intent, Cursor, Result, Validation,
  * Fingerprint, Errors, Strategy, BackendApi).
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export namespace Contracts {
   export namespace Intent {

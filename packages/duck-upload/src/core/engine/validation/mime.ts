@@ -2,25 +2,20 @@ import type { Contracts } from '../../contracts'
 import { __mimeWarnings, mimeMatches, sniffMime } from '../../utils/mime-sniff'
 
 /**
- * SEC-004: cross-check the claimed `file.type` against the file's magic
- * bytes. Reads the first 16 bytes only (the longest signature handled by
- * {@link sniffMime} is 12 bytes; 16 is a small safety margin).
+ * Cross-check the claimed `file.type` against the file's magic bytes. Reads the
+ * first 16 bytes only (the longest signature {@link sniffMime} handles is 12).
  *
- * @returns A `mime_mismatch` reject reason when `strict` is `true` and
- *   the sniff disagrees. Returns `null` (allow) when the sniff returns
- *   `null` (unknown), when the claim matches, or when `strict` is `false`
- *   (in which case a one-time-per-mismatched-pair `console.warn` is
- *   emitted as defense-in-depth telemetry).
- *
- * Files smaller than 1 byte (already rejected by `validateFile` upstream)
- * resolve to `null` here for safety.
+ * @returns A `mime_mismatch` reject reason when `strict` is `true` and the
+ *   sniff disagrees. Returns `null` (allow) when the sniff is inconclusive, the
+ *   claim matches, or `strict` is `false` — in the non-strict case a one-time
+ *   warning is logged per mismatched pair. Empty files resolve to `null`.
  */
 export async function validateMimeSignature(
   file: File,
   strict: boolean,
 ): Promise<Contracts.Validation.Rejection | null> {
   if (file.size === 0) return null
-  // 16 bytes is enough — every signature we recognise fits in 12.
+  // 16 bytes covers every recognised signature (longest is 12).
   const head = await file.slice(0, 16).arrayBuffer()
   const sniffed = sniffMime(new Uint8Array(head))
   if (sniffed === null) return null
@@ -34,7 +29,7 @@ export async function validateMimeSignature(
   const key = `${claimed || '<empty>'}::${sniffed}`
   if (!__mimeWarnings.has(key)) {
     __mimeWarnings.add(key)
-    // Note: filename intentionally NOT included (SEC-003 — tainted input).
+    // Filename is omitted from the warning: it is untrusted input.
     console.warn(
       `[duck-upload] MIME mismatch: claimed "${claimed || '<empty>'}" but bytes look like "${sniffed}". ` +
         'Set `strictMimeMatch: true` to reject these files.',

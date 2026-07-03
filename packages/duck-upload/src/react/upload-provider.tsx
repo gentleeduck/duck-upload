@@ -1,24 +1,9 @@
-import type React from 'react'
 import { createContext, useContext, useEffect } from 'react'
 import type { Contracts } from '../core'
 import type { Store } from '../core/engine/store'
+import type { Uploader } from './uploader.types'
 
 const UploadContext = createContext<Store.UploadStore<any, any, any, any> | null>(null)
-
-/**
- * Props for the `<UploadProvider>` component.
- */
-export interface UploadProviderProps<
-  M extends Contracts.Intent.Map,
-  C extends Contracts.Cursor.Map<M>,
-  P extends string,
-  R extends Contracts.Result.Base = Contracts.Result.Base,
-> {
-  /** The upload store instance to distribute. */
-  store: Store.UploadStore<M, C, P, R>
-  /** React child elements. */
-  children: React.ReactNode
-}
 
 /**
  * Context provider that distributes the upload store across the React component hierarchy.
@@ -38,13 +23,14 @@ export interface UploadProviderProps<
  *   );
  * }
  * ```
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export function UploadProvider<
   M extends Contracts.Intent.Map,
   C extends Contracts.Cursor.Map<M>,
   P extends string,
   R extends Contracts.Result.Base = Contracts.Result.Base,
->({ store, children }: UploadProviderProps<M, C, P, R>) {
+>({ store, children }: Uploader.ProviderProps<M, C, P, R>) {
   // Safe cleanup: destroy the store runner instance if the provider is unmounted.
   useEffect(() => {
     return () => {
@@ -60,6 +46,7 @@ export function UploadProvider<
 /**
  * Returns the active upload store instance from context.
  * Throws a runtime exception if called outside an `<UploadProvider>`.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export function useUploadStore<
   M extends Contracts.Intent.Map,
@@ -74,6 +61,11 @@ export function useUploadStore<
   return context as Store.UploadStore<M, C, P, R>
 }
 
+/**
+ * Runtime type guard: returns `true` when `value` exposes the upload-store
+ * surface (`getSnapshot`, `subscribe`, `dispatch`, `on`, `off`, `waitFor`).
+ * @author wildduck2 <https://github.com/wildduck2>
+ */
 export function isUploadStore<
   M extends Contracts.Intent.Map,
   C extends Contracts.Cursor.Map<M>,

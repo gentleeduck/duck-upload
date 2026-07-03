@@ -1,8 +1,10 @@
+import type React from 'react'
 import type { Contracts, Engine } from '../core'
 import type { Store } from '../core/engine/store'
 
 /**
  * Public typings and namespaces consumed by React hook components.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export namespace Uploader {
   /**
@@ -59,5 +61,20 @@ export namespace Uploader {
   > = Pick<Store.UploadStore<M, C, P, R>, 'dispatch' | 'on'> & {
     /** The raw upload store instance. */
     store: Store.UploadStore<M, C, P, R>
+  }
+
+  /**
+   * Props for the `<UploadProvider>` component.
+   */
+  export interface ProviderProps<
+    M extends Contracts.Intent.Map,
+    C extends Contracts.Cursor.Map<M>,
+    P extends string,
+    R extends Contracts.Result.Base = Contracts.Result.Base,
+  > {
+    /** The upload store instance to distribute. */
+    store: Store.UploadStore<M, C, P, R>
+    /** React child elements. */
+    children: React.ReactNode
   }
 }

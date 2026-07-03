@@ -6,6 +6,7 @@ import type { createReducer } from '../reducer'
 
 /**
  * Store-level namespaces and contracts.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export namespace Store {
   /**

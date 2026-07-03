@@ -37,13 +37,13 @@ describe('UploadEngineError', () => {
   })
 })
 
-describe('engine handlers — SEC-003 inverse assertion', () => {
+describe('engine handlers filename-in-message inverse assertion', () => {
   // The legacy contract was: `error.message.includes(filename)`. The new
   // contract is the opposite: the filename MUST NOT appear in `message`. The
   // handlers no longer interpolate filename into `message`; verifying that by
   // exercising the handlers directly is covered by the integration suite, but
   // we keep the contract pinned here so future refactors stay safe.
-  test('a structured error built per SEC-003 keeps the message clean and surfaces filename only on context', () => {
+  test('a structured error keeps the message clean and surfaces filename only on context', () => {
     const base = { code: 'unknown' as const, message: 'Unknown error', retryable: false }
     const error = {
       ...base,

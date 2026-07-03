@@ -105,6 +105,7 @@ function xhrRequest(args: {
 /**
  * Browser-native XHR transport. Uses `XMLHttpRequest` over `fetch` because
  * `fetch` lacks cross-browser upload-progress events.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export function createXHRTransport(): Transport.Options & {
   /** Optional PATCH for tus-style strategies. */

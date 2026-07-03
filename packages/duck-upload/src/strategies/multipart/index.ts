@@ -1,6 +1,6 @@
 /**
  * S3/MinIO-style multipart strategy: sign each part on demand via `signPart`,
- * PUT, then finalize with `completeMultipart` using collected ETags. Resumable —
+ * PUT, then finalize with `completeMultipart` using collected ETags. Resumable
  * persists ETags in the cursor and skips already-completed sessions.
  */
 
@@ -12,6 +12,7 @@ const DEFAULT_MAX_PART_CONCURRENCY = 4
 
 /**
  * Namespace containing types and interfaces specific to the S3/MinIO multipart upload strategy.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export namespace MultipartStrategy {
   /**
@@ -91,8 +92,6 @@ export function __resetMultipartWarningsForTests(): void {
  * input is not a well-formed 32-bit hex tail. Both groups may be 1–4 hex
  * digits; the second group may be omitted leading zeros (`7f00:1` ==
  * `7f00:0001`).
- *
- * Ported verbatim from duck-iam (proven against rescans 003/004/006).
  */
 function hexTailToDottedQuad(tail: string): string | null {
   const m = /^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(tail)
@@ -107,11 +106,10 @@ function hexTailToDottedQuad(tail: string): string | null {
 }
 
 /**
- * Reject hosts that resolve (literally) to a private/loopback/link-local/
- * cloud-metadata/CGNAT/multicast/broadcast address. We only block IP literals
- * — DNS rebinding is out of scope for a client-side check.
+ * Reject hosts that literally resolve to a private/loopback/link-local/
+ * cloud-metadata/CGNAT/multicast/broadcast address. Only IP literals are
+ * blocked; DNS rebinding is not covered by a client-side check.
  *
- * Ported from duck-iam's `_isPrivateHost` (proven across rescans 003/004/006).
  * Covers:
  * - IPv4: 127/8, 10/8, 172.16/12, 192.168/16, 169.254/16 (link-local +
  *   AWS metadata 169.254.169.254), 0/8 (this-network), 100.64/10 (CGNAT),
@@ -119,7 +117,7 @@ function hexTailToDottedQuad(tail: string): string | null {
  * - IPv6: ::1, ::, fc00::/7, fe80::/10, ff00::/8 (multicast).
  * - Embedded IPv4: IPv4-mapped (`::ffff:a.b.c.d`, hex form `::ffff:7f00:1`,
  *   fully expanded `0:0:0:0:0:ffff:...`), IPv4-compatible (`::a.b.c.d`),
- *   6to4 (`2002:AABB:CCDD::`), NAT64 (`64:ff9b::v4`) — all decoded and
+ *   6to4 (`2002:AABB:CCDD::`), NAT64 (`64:ff9b::v4`)  all decoded and
  *   recursed against the IPv4 list.
  * - Strips a single trailing FQDN dot before checks.
  */
@@ -154,14 +152,14 @@ function isPrivateHost(host: string): boolean {
     const lower = h.toLowerCase()
     if (lower === '::1' || lower === '0:0:0:0:0:0:0:1') return true
     if (lower === '::' || lower === '0:0:0:0:0:0:0:0') return true
-    // fc00::/7 — first byte 0xfc or 0xfd
+    // fc00::/7  first byte 0xfc or 0xfd
     if (/^f[cd][0-9a-f]{0,2}:/.test(lower)) return true
-    // fe80::/10 — fe8x, fe9x, feax, febx
+    // fe80::/10  fe8x, fe9x, feax, febx
     if (/^fe[89ab][0-9a-f]?:/.test(lower)) return true
-    // ff00::/8 — IPv6 multicast (mirrors IPv4 224/4 coverage)
+    // ff00::/8  IPv6 multicast (mirrors IPv4 224/4 coverage)
     if (/^ff[0-9a-f]{0,2}:/.test(lower)) return true
 
-    // IPv4-mapped IPv6 — `::ffff:a.b.c.d` (dotted-quad tail) or
+    // IPv4-mapped IPv6  `::ffff:a.b.c.d` (dotted-quad tail) or
     // `::ffff:hhhh:hhhh` (hex tail, canonical form Node's URL parser emits).
     // Also accept the fully expanded `0:0:0:0:0:ffff:...` form.
     let mappedTail: string | null = null
@@ -174,7 +172,7 @@ function isPrivateHost(host: string): boolean {
       return false
     }
 
-    // IPv4-compatible IPv6 (deprecated RFC4291 §2.5.5.1) — `::a.b.c.d`.
+    // IPv4-compatible IPv6 (deprecated RFC4291 §2.5.5.1)  `::a.b.c.d`.
     if (lower.startsWith('::') && lower.includes('.')) {
       const tail = lower.slice(2)
       if (/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(tail)) return isPrivateHost(tail)
@@ -182,7 +180,7 @@ function isPrivateHost(host: string): boolean {
 
     // 6to4 prefix `2002::/16` carries an inner IPv4 in the next two 16-bit
     // groups (`2002:AABB:CCDD::` → `A.B.C.D` with bytes AA,BB,CC,DD).
-    // Linux ships 6to4 by default — `2002:7f00:1::` carries `127.0.0.1`.
+    // Linux ships 6to4 by default  `2002:7f00:1::` carries `127.0.0.1`.
     if (lower.startsWith('2002:')) {
       const m = /^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4})(?::|$)/.exec(lower)
       if (m) {
@@ -296,6 +294,7 @@ function isAbort(err: unknown) {
  *   multipartStrategy({ maxPartConcurrency: 4 })
  * ]);
  * ```
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export function multipartStrategy<
   M extends Contracts.Intent.Map & { multipart: MultipartStrategy.Intent },
@@ -316,7 +315,7 @@ export function multipartStrategy<
       const totalBytes = ctx.file.size
       const partSize = Math.max(1, intent.partSize)
 
-      // Trust backend `partCount` when provided — S3-style backends enforce a maxParts rule.
+      // Trust backend `partCount` when provided  S3-style backends enforce a maxParts rule.
       const totalParts = Math.max(1, intent.partCount ?? Math.ceil(totalBytes / partSize))
 
       const cursor = ctx.readCursor()
@@ -357,7 +356,7 @@ export function multipartStrategy<
       const running = new Set<Promise<void>>()
 
       const getSignedPart = async (partNumber: number) => {
-        // Legacy fast path: backend pre-signed all parts in `intent.parts`.
+        // Fast path: backend pre-signed all parts in `intent.parts`.
         const fromIntent = intent.parts?.find((x) => x.partNumber === partNumber)
         if (fromIntent) return fromIntent
 

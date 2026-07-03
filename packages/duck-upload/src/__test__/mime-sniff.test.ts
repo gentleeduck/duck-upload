@@ -81,7 +81,7 @@ describe('mimeMatches', () => {
     ).toBe(true)
   })
 
-  test('JPEG bytes with claimed PDF type — mismatch', () => {
+  test('JPEG bytes with claimed PDF type  mismatch', () => {
     expect(mimeMatches('application/pdf', 'image/jpeg')).toBe(false)
   })
 })
@@ -104,7 +104,7 @@ describe('validateMimeSignature', () => {
     expect(reason).toBeNull()
     expect(warnSpy).toHaveBeenCalledTimes(1)
     expect(String(warnSpy.mock.calls[0]?.[0] ?? '')).toMatch(/MIME mismatch/)
-    // Filename MUST NOT appear in the warning (SEC-003 — tainted input).
+    // Filename must not appear in the warning: it is untrusted input.
     expect(String(warnSpy.mock.calls[0]?.[0] ?? '')).not.toMatch(/evil\.pdf/)
     warnSpy.mockRestore()
   })

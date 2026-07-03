@@ -161,7 +161,7 @@ describe('MemoryAdapter', () => {
   })
 })
 
-describe('createMemoryAdapter — SEC-008 factory isolation', () => {
+describe('createMemoryAdapter factory isolation', () => {
   test('two factory calls produce isolated state', async () => {
     const a = createMemoryAdapter()
     const b = createMemoryAdapter()

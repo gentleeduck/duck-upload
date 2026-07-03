@@ -2,6 +2,7 @@ import type { Contracts } from './contracts'
 
 /**
  * Structured extra context properties for upload errors.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export type UploadErrorContext = Record<string, unknown>
 
@@ -26,6 +27,7 @@ const STATIC_MESSAGES: Record<string, string> = {
  *
  * Always carries a stable error classification `code` and an immutable, static
  * `message`. Attic strings (like raw input details) live under `context` or subclass-specific fields.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export class UploadEngineError extends Error {
   /** Stable machine-readable error code. */
@@ -58,6 +60,7 @@ export class UploadEngineError extends Error {
 
 /**
  * Error thrown when file validation rules fail.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export class UploadValidationError extends UploadEngineError {
   /** Structured rejection reason details. */
@@ -81,6 +84,7 @@ export class UploadValidationError extends UploadEngineError {
 
 /**
  * Error thrown when an upload strategy identifier is not registered.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export class UploadStrategyMissingError extends UploadEngineError {
   /** Unregistered strategy identifier. */
@@ -100,6 +104,7 @@ export class UploadStrategyMissingError extends UploadEngineError {
 
 /**
  * Error thrown when an upload is aborted (paused or canceled).
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export class UploadAbortError extends UploadEngineError {
   /** Reason context for the abort. */
@@ -123,6 +128,7 @@ export class UploadAbortError extends UploadEngineError {
 
 /**
  * Error thrown on transport-level connection or fetch failures.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export class UploadNetworkError extends UploadEngineError {
   constructor(message?: string, init?: { cause?: unknown; context?: UploadErrorContext }) {
@@ -138,6 +144,7 @@ export class UploadNetworkError extends UploadEngineError {
 
 /**
  * Error thrown when a non-2xx HTTP status response is returned.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export class UploadHttpError extends UploadEngineError {
   /** HTTP response status code. */
@@ -170,6 +177,7 @@ export class UploadHttpError extends UploadEngineError {
 
 /**
  * Error thrown when a timeout occurs during network operations.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export class UploadTimeoutError extends UploadEngineError {
   constructor(message?: string, init?: { cause?: unknown; context?: UploadErrorContext }) {
@@ -185,6 +193,7 @@ export class UploadTimeoutError extends UploadEngineError {
 
 /**
  * Error thrown on authentication / authorization failures.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export class UploadAuthError extends UploadEngineError {
   constructor(message?: string, init?: { cause?: unknown; context?: UploadErrorContext }) {
@@ -200,6 +209,7 @@ export class UploadAuthError extends UploadEngineError {
 
 /**
  * Error thrown when the endpoint indicates rate limits are exceeded.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export class UploadRateLimitError extends UploadEngineError {
   /** Optional delay value recommended by the server before retry. */
@@ -219,6 +229,7 @@ export class UploadRateLimitError extends UploadEngineError {
 
 /**
  * Error thrown when custom backend/server validation errors are reported.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export class UploadServerError extends UploadEngineError {
   /** Server-defined diagnostic code. */
@@ -238,6 +249,7 @@ export class UploadServerError extends UploadEngineError {
 
 /**
  * Fallback error class for unclassified or legacy throws.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export class UploadUnknownError extends UploadEngineError {
   constructor(message?: string, init?: { cause?: unknown; context?: UploadErrorContext }) {
@@ -254,5 +266,6 @@ export class UploadUnknownError extends UploadEngineError {
 /**
  * Runtime error stored on items and passed through engine events.
  * Plain contract shapes and {@link UploadEngineError} subclasses are both valid.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export type UploadError = Contracts.Errors.Error | UploadEngineError

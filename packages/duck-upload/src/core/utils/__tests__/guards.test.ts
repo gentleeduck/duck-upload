@@ -24,7 +24,7 @@ describe('stripDangerousKeys', () => {
     expect(out.list[1]).toEqual({ v: 2 })
   })
 
-  test('depth cap of 16 — does not throw on deeply nested input, returns input as-is past the cap', () => {
+  test('depth cap of 16  does not throw on deeply nested input, returns input as-is past the cap', () => {
     type Node = { child?: Node; v?: number; __proto__?: unknown }
     let depth = 0
     let leaf: Node = { v: 0 }
@@ -65,7 +65,7 @@ describe('stripDangerousKeys', () => {
   })
 })
 
-describe('isRecord (SEC-002 tightening)', () => {
+describe('isRecord (plain-record tightening)', () => {
   test('rejects arrays', () => {
     expect(isRecord([])).toBe(false)
     expect(isRecord([1, 2])).toBe(false)

@@ -35,9 +35,8 @@ export function buildApiContext<
 export const DEFAULT_CHECKSUM_MAX_SIZE = 64 * 1024 * 1024
 
 /**
- * Module-level dedup set for one-time-per-session `console.info` notices.
- * Keyed by reason string so each distinct notice fires exactly once for the
- * lifetime of the JS realm.
+ * Dedup set for one-time-per-session `console.info` notices, keyed by reason
+ * string so each distinct notice fires once per JS realm.
  * @internal exported for tests.
  */
 export const __checksumNoticesEmitted = new Set<string>()
@@ -45,19 +44,12 @@ export const __checksumNoticesEmitted = new Set<string>()
 /**
  * SHA-256 checksum of `file` for deduplication.
  *
- * SEC-007/018: when `file.size` exceeds the resolved cap, the checksum is
- * **skipped entirely** and `null` is returned — no I/O is performed on
- * `file` (neither `arrayBuffer()` nor `stream()` is called). The previous
- * streaming implementation accumulated every chunk into a `Uint8Array[]`
- * then concatenated into a single contiguous buffer for `subtle.digest`,
- * yielding a peak memory of ~2× file size — strictly worse than the
- * arrayBuffer path it was meant to replace. A bounded-memory streaming
- * path would require an incremental SHA-256 implementation, which the
- * Web Crypto API does not provide; vendoring one is out of scope for
- * this library, so we trade dedupe coverage for a hard memory ceiling.
- *
- * Operators that need dedupe on large files should raise `checksumMaxSize`
- * (accepting the memory cost) or compute fingerprints out-of-band.
+ * When `file.size` exceeds the resolved cap the checksum is skipped and `null`
+ * is returned, with no I/O performed on `file`. Hashing large files requires
+ * reading the whole buffer into memory (Web Crypto has no incremental digest),
+ * so the cap trades dedupe coverage for a hard memory ceiling. Operators that
+ * need dedupe on large files should raise `checksumMaxSize` or compute
+ * fingerprints out-of-band.
  *
  * Pass `maxSize = 0` or omit it to use {@link DEFAULT_CHECKSUM_MAX_SIZE}.
  *

@@ -34,6 +34,11 @@ function txDone(tx: IDBTransaction): Promise<void> {
   })
 }
 
+/**
+ * Persistence adapter backed by IndexedDB, for durable snapshot storage in the
+ * browser without the size limits of `localStorage`.
+ * @author wildduck2 <https://github.com/wildduck2>
+ */
 export const IndexedDBAdapter: UploadPersistence.Adapter = {
   async load(key) {
     if (typeof indexedDB === 'undefined') return null

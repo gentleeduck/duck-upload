@@ -8,6 +8,7 @@ import type { UploadPersistence } from './persistence.types'
  * Serializes the current upload state into a JSON-safe structure.
  * Only serializes items that have a valid 'intent', as these are the only ones
  * that can be resumed cleanly.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export function serializeSnapshot<
   M extends Contracts.Intent.Map,
@@ -66,6 +67,7 @@ export function serializeSnapshot<
  * - Browser `File` objects cannot be restored from persistence.
  * - We restore resumable items (those with a cursor) into the `paused` phase,
  *   with `file` left undefined. Your UI can ask the user to rebind the file.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export function deserializeSnapshot<
   M extends Contracts.Intent.Map,

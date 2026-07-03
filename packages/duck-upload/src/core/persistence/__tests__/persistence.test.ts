@@ -1,7 +1,7 @@
 /**
- * SEC-002 — defense against prototype-pollution via persisted snapshots.
- * The legacy round-trip tests live in `src/__test__/persistence.test.ts`;
- * this file is scoped to security regressions.
+ * Defense against prototype-pollution via persisted snapshots. Round-trip
+ * tests live in `src/__test__/persistence.test.ts`; this file is scoped to
+ * security regressions.
  */
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { isRecord } from '../../utils/guards'
@@ -35,7 +35,7 @@ function installLocalStorageStub(): LocalStorageStub {
   return stub
 }
 
-describe('LocalStorageAdapter — SEC-002 prototype-pollution defense', () => {
+describe('LocalStorageAdapter prototype-pollution defense', () => {
   let stub: LocalStorageStub
 
   beforeEach(() => {

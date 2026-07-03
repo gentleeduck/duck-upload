@@ -6,8 +6,8 @@
  * all modern browsers in secure contexts). On legacy runtimes we fall
  * back to {@link Crypto.getRandomValues} + manual v4 formatting.
  *
- * Throws if no CSPRNG is reachable — `Math.random()` is deliberately
- * NOT used (SEC-006: predictable IDs collide and leak ordering).
+ * Throws if no CSPRNG is reachable; `Math.random()` is deliberately not used,
+ * since predictable IDs can collide and leak creation ordering.
  */
 export function generateId(): string {
   return `upload_${Date.now()}_${randomUUIDv4()}`

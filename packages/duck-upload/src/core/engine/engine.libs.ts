@@ -8,6 +8,7 @@ import type { Engine } from './engine.types'
 
 /**
  * Normalizes user config by applying sensible defaults.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export function resolveUploadConfig<P extends string>(input?: Partial<Engine.Config<P>>): Engine.Config<P> {
   return {

@@ -22,5 +22,19 @@ export namespace Emitter {
     emit<K extends keyof E & string>(type: K, payload: E[K]): void
   }
 
+  /**
+   * Callback invoked when a listener throws during `emit`, so one bad listener
+   * cannot break the dispatch loop. Receives the event type, the thrown error,
+   * and the listener that threw.
+   */
   export type ErrorHandler = (type: string, error: unknown, cb: (...args: any[]) => void) => void
+
+  /**
+   * Listener registry, bucketed by event type.
+   *
+   * @template E Event map.
+   */
+  export type ListenerMap<E extends Record<string, unknown>> = Partial<{
+    [K in keyof E & string]: Set<(payload: E[K]) => void>
+  }>
 }

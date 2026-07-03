@@ -6,6 +6,11 @@
 
 import type { Contracts } from '../../core/contracts'
 
+/**
+ * Create an empty strategy registry. Register upload strategies with `set`, then
+ * resolve them by id with `get` / `has`.
+ * @author wildduck2 <https://github.com/wildduck2>
+ */
 export function createStrategyRegistry<
   M extends Contracts.Intent.Map,
   C extends Contracts.Cursor.Map<M>,

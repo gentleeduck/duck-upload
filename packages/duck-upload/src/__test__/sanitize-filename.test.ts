@@ -42,7 +42,7 @@ describe('sanitizeFilename', () => {
   })
 
   test('RTL override and other compat chars get NFKC normalised', () => {
-    // U+202E RIGHT-TO-LEFT OVERRIDE — stripped via NFKC?
+    // U+202E RIGHT-TO-LEFT OVERRIDE  stripped via NFKC?
     // NFKC does not strip RLO, but the test confirms normalize() is applied;
     // we focus on the fullwidth → ASCII collapse which is the typical bypass.
     const fullwidth = 'ｆｕｌｌ.pdf' // "ｆｕｌｌ.pdf" → "full.pdf"
@@ -55,7 +55,7 @@ describe('sanitizeFilename', () => {
     expect(r).toEqual({ safe: true, normalised: 'filename.txt' })
   })
 
-  test('control chars cleaned (CR/LF — header smuggling)', () => {
+  test('control chars cleaned (CR/LF  header smuggling)', () => {
     const r = sanitizeFilename('a\r\nb.txt')
     expect(r).toEqual({ safe: true, normalised: 'ab.txt' })
   })

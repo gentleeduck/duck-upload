@@ -1,3 +1,7 @@
+/**
+ * Transport contracts: the network layer the engine uses to move bytes.
+ * @author wildduck2 <https://github.com/wildduck2>
+ */
 export namespace Transport {
   /**
    * Abstraction layer for network operations.

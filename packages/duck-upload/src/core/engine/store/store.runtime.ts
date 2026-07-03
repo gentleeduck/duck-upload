@@ -11,7 +11,7 @@ import type { Store } from './store.types'
 
 /**
  * Build the store runtime: state, emitter, reducer, and effect queue.
- * Reducers stay pure — async work goes through {@link StoreRuntime.enqueueEffect}.
+ * Reducers stay pure  async work goes through {@link StoreRuntime.enqueueEffect}.
  * `dispatch` is assigned later by `createUploadStore` to break an import cycle.
  */
 export function createStoreRuntime<
@@ -147,14 +147,14 @@ export function createStoreRuntime<
       rt.processingEffects = false
     },
 
-    // Replaced by createUploadStore — runtime breaks the cycle.
+    // Replaced by createUploadStore  runtime breaks the cycle.
     dispatch: () => {
       throw new Error('[UploadEngine] dispatch not initialized')
     },
   } satisfies Store.Runtime<M, C, P, R>
 
   // Async adapters (IndexedDB) resolve after construction; only hydrate when no
-  // initialState was provided. Merge into an empty store only — never clobber
+  // initialState was provided. Merge into an empty store only  never clobber
   // user actions that arrived before the load resolved.
   if (persistence && !resolvedOpts.initialState && typeof window !== 'undefined') {
     try {

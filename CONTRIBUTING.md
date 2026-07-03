@@ -1,7 +1,7 @@
 # Contributing to duck-upload
 
 First off, thank you for considering contributing to **duck-upload**!
-We welcome all kinds of contributions — from bug reports and documentation improvements to feature requests and new packages.
+We welcome all kinds of contributions  from bug reports and documentation improvements to feature requests and new packages.
 
 This document provides guidelines to help you get started.
 

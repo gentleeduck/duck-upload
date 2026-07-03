@@ -5,6 +5,7 @@ import type { Store } from './store'
 /**
  * Engine-level type surface containing runtime state models, commands, progress,
  * and configuration options.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export namespace Engine {
   /**

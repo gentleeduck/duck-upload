@@ -28,7 +28,7 @@ describe('generateId', () => {
   })
 })
 
-describe('generateId — fallback path (no crypto.randomUUID)', () => {
+describe('generateId  fallback path (no crypto.randomUUID)', () => {
   const originalCrypto = (globalThis as { crypto?: Crypto }).crypto
 
   afterEach(() => {

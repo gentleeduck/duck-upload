@@ -41,6 +41,7 @@ import type { Uploader } from './uploader.types'
  * @template C - Cursor map type
  * @template P - Purpose string union type
  * @template R - Backend result shape
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export function useUploader<
   M extends Contracts.Intent.Map,
@@ -107,6 +108,7 @@ export function useUploader<
  * reference to the store instance. Does not trigger React re-renders on upload progress or state changes.
  *
  * Use this when you only need to trigger commands or subscribe to events without binding UI lists.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export function useUploaderActions<
   M extends Contracts.Intent.Map,
@@ -126,6 +128,7 @@ export function useUploaderActions<
  * Creates a bound `useUploader` hook pre-configured for a specific store instance.
  *
  * Useful for building static multi-uploader widgets or context-free setups.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export function createUploadFactory<
   M extends Contracts.Intent.Map,

@@ -3,6 +3,7 @@ import type { Engine } from '../engine/engine.types'
 
 /**
  * Persistence layer interfaces and options.
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export namespace UploadPersistence {
   /**

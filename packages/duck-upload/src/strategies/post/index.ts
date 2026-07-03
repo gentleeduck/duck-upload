@@ -1,6 +1,10 @@
 import type { Contracts } from '../../core'
 import { UploadEngineError } from '../../core'
 
+/**
+ * Types for the presigned HTTP POST upload strategy.
+ * @author wildduck2 <https://github.com/wildduck2>
+ */
 export namespace PostStrategy {
   /**
    * Presigned HTTP POST strategy configuration options.
@@ -53,6 +57,7 @@ export namespace PostStrategy {
  *   MultipartStrategy()
  * ]);
  * ```
+ * @author wildduck2 <https://github.com/wildduck2>
  */
 export function PostStrategy<
   M extends Contracts.Intent.Map,

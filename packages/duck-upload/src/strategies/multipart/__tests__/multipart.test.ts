@@ -148,7 +148,7 @@ describe('validatePartUrl', () => {
   })
 })
 
-describe('multipartStrategy — happy path', () => {
+describe('multipartStrategy  happy path', () => {
   beforeEach(() => {
     __resetMultipartWarningsForTests()
   })

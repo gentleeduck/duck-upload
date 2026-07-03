@@ -1,6 +1,6 @@
 # Agent Skills
 
-This directory contains agent skills for the gentleduck/upload ecosystem. Each skill teaches AI coding agents how to work with a specific package — its API, patterns, coding style, and conventions.
+This directory contains agent skills for the gentleduck/upload ecosystem. Each skill teaches AI coding agents how to work with a specific package  its API, patterns, coding style, and conventions.
 
 Skills follow the open [Agent Skills specification](https://agentskills.io/specification) and work with Claude Code, GitHub Copilot, Cursor, Cline, OpenCode, and 30+ other agents.
 
@@ -45,7 +45,7 @@ skills/{name}/
 name: skill-name
 description: >-
   When to activate this skill. Write in third person. Be specific about
-  the trigger conditions — this text determines whether the agent loads
+  the trigger conditions  this text determines whether the agent loads
   the skill, so vague descriptions cause false activations.
 allowed-tools: Read Grep Glob
 argument-hint: "[optional-argument-hint]"
@@ -78,7 +78,7 @@ Put detailed content in `references/` subdirectory. Reference from SKILL.md:
 For the full coding style guide, see [CODING-STYLE.md](references/CODING-STYLE.md).
 ```
 
-The agent only reads reference files when it needs them, keeping the initial context small. This is important for performance — a 200-line SKILL.md plus on-demand references is much better than a 2000-line monolith.
+The agent only reads reference files when it needs them, keeping the initial context small. This is important for performance  a 200-line SKILL.md plus on-demand references is much better than a 2000-line monolith.
 
 ## Creating a New Skill
 
@@ -98,8 +98,8 @@ The agent only reads reference files when it needs them, keeping the initial con
    - Show real code from the actual codebase, not hypothetical examples
 
 3. Optionally add reference files for deeper content:
-   - `references/CODING-STYLE.md` — file structure, naming, annotated code template
-   - `references/API.md` — detailed API reference
+   - `references/CODING-STYLE.md`  file structure, naming, annotated code template
+   - `references/API.md`  detailed API reference
 
 4. Test the skill locally by symlinking into `.claude/skills/`:
 
