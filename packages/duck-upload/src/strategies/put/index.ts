@@ -4,21 +4,21 @@ import { validateUploadUrl } from '../../core/utils/url-safety'
 import { withRetry } from '../_shared/retry'
 
 /**
- * Types for the presigned HTTP POST upload strategy.
+ * Types for the single-request presigned HTTP PUT upload strategy.
  * @author wildduck2 <https://github.com/wildduck2>
  */
-export namespace PostStrategy {
+export namespace PutStrategy {
   /**
-   * Presigned HTTP POST strategy configuration options.
+   * Presigned HTTP PUT strategy configuration options.
    */
   export type Config = {
     /**
      * Case-insensitive allow-list of host names (with optional port). When
-     * set, the presigned POST URL must match a listed host or it is rejected.
+     * set, the presigned PUT URL must match a listed host or it is rejected.
      */
     allowedHosts?: string[]
     /**
-     * When `true`, allow private-network IP literals in the POST URL.
+     * When `true`, allow private-network IP literals in the PUT URL.
      * Defaults to `false`.
      */
     allowPrivateHosts?: boolean
@@ -30,17 +30,18 @@ export namespace PostStrategy {
   }
 
   /**
-   * Presigned HTTP POST intent payload mapping parameters returned by backend endpoints.
+   * Presigned HTTP PUT intent payload. The whole file body is sent in one
+   * request to a backend-signed URL (e.g. S3 `putObject`, GCS signed PUT).
    */
   export type Intent = {
     /** Discriminant identifier matching strategy configuration registry keys. */
-    strategy: 'post'
+    strategy: 'put'
     /** Unique database identifier for the file resource. */
     fileId: string
-    /** Presigned POST action destination URL (e.g. presigned S3/GCS bucket location). */
+    /** Presigned PUT destination URL. */
     url: string
-    /** Key/value pair list representing form properties (e.g. AWS credential fields, policies). */
-    fields: Record<string, string>
+    /** Optional request headers required by the signature (e.g. `Content-Type`). */
+    headers?: Record<string, string>
     /** Optional epoch string indicating when the pre-signed credentials lapse. */
     expiresAt?: string
   }
@@ -51,8 +52,8 @@ export namespace PostStrategy {
   export type Cursor = Record<string, never>
 }
 
-/** Convenience alias for {@link PostStrategy.Intent}. */
-export type PostIntent = PostStrategy.Intent
+/** Convenience alias for {@link PutStrategy.Intent}. */
+export type PutIntent = PutStrategy.Intent
 
 let warnedMissingAllowedHosts = false
 
@@ -60,72 +61,75 @@ let warnedMissingAllowedHosts = false
  * Reset the warn-once latch. Test-only.
  * @internal
  */
-export function __resetPostWarningsForTests(): void {
+export function __resetPutWarningsForTests(): void {
   warnedMissingAllowedHosts = false
 }
 
 /**
- * Presigned HTTP POST form strategy.
+ * Presigned single-request HTTP PUT strategy.
  *
- * Sends the entire file along with backend policy fields as a single
- * `multipart/form-data` request body. Does not support resumability.
+ * Sends the entire file as the request body to a backend-signed URL in one PUT.
+ * The most common direct-to-storage pattern (S3 `putObject`, GCS/Azure signed
+ * PUT). Not resumable — use {@link multipartStrategy} or the tus strategy for
+ * resumable transfers.
  *
  * Security: the presigned URL is backend-supplied and flows straight to the
  * transport, so a compromised backend or MITM could return a `file:`,
  * `javascript:`, or private-network URL. Every URL is checked with
- * {@link validateUploadUrl}; set {@link PostStrategy.Config.allowedHosts} to
+ * {@link validateUploadUrl}; set {@link PutStrategy.Config.allowedHosts} to
  * lock it to known hosts, or leave `allowPrivateHosts` at its default `false`
  * to block loopback/private addresses.
  *
  * @example
  * ```ts
  * const strategies = createStrategyRegistry([
- *   PostStrategy({ allowedHosts: ['uploads.example.com'] }),
- *   MultipartStrategy()
+ *   PutStrategy({ allowedHosts: ['uploads.example.com'] }),
+ *   multipartStrategy(),
  * ]);
  * ```
  * @author wildduck2 <https://github.com/wildduck2>
  */
-export function PostStrategy<
+export function PutStrategy<
   M extends Contracts.Intent.Map,
   C extends Contracts.Cursor.Map<M>,
   P extends string,
   R extends Contracts.Result.Base = Contracts.Result.Base,
->(opts: PostStrategy.Config = {}): Contracts.Strategy.Me<M, C, P, R, 'post'> {
+>(opts: PutStrategy.Config = {}): Contracts.Strategy.Me<M, C, P, R, 'put'> {
   const allowedHosts = opts.allowedHosts ?? []
   const allowPrivateHosts = opts.allowPrivateHosts === true
 
   return {
-    id: 'post',
+    id: 'put',
     resumable: false,
 
     async start(ctx) {
-      const intent = ctx.intent as unknown as PostStrategy.Intent
+      const intent = ctx.intent as unknown as PutStrategy.Intent
 
       if (!intent.url) {
-        throw new UploadEngineError('validation_failed', { message: 'post.start: intent missing url' })
+        throw new UploadEngineError('validation_failed', { message: 'put.start: intent missing url' })
       }
 
       if (allowedHosts.length === 0 && !warnedMissingAllowedHosts) {
         warnedMissingAllowedHosts = true
         console.warn(
-          '[duck-upload] PostStrategy: no `allowedHosts` configured. Presigned POST URLs will be host-unrestricted. ' +
-            'Set PostStrategy.Config.allowedHosts to lock the upload host.',
+          '[duck-upload] PutStrategy: no `allowedHosts` configured. Presigned PUT URLs will be host-unrestricted. ' +
+            'Set PutStrategy.Config.allowedHosts to lock the upload host.',
         )
       }
 
-      validateUploadUrl(intent.url, 'post.intent', { allowedHosts, allowPrivateHosts })
+      validateUploadUrl(intent.url, 'put.intent', { allowedHosts, allowPrivateHosts })
+
+      const totalBytes = ctx.file.size
 
       await withRetry(
         () =>
-          ctx.transport.postForm({
+          ctx.transport.put({
             url: intent.url,
-            file: ctx.file,
-            fields: intent.fields,
-            filename: ctx.file.name,
+            body: ctx.file,
+            headers: intent.headers ?? {},
             signal: ctx.signal,
-            onProgress(uploadedBytes, totalBytes) {
-              ctx.reportProgress({ uploadedBytes, totalBytes })
+            onProgress(uploadedBytes, total) {
+              ctx.reportProgress({ uploadedBytes, totalBytes: total || totalBytes })
             },
           }),
         { signal: ctx.signal, ...(opts.maxRetries !== undefined ? { maxRetries: opts.maxRetries } : {}) },
