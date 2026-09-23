@@ -79,7 +79,7 @@ jobs:
         run: bunx turbo run build --filter='./packages/*'
 
       - name: Create Release Pull Request
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
           version: bun run version-packages
           title: "chore: version packages"
@@ -134,7 +134,7 @@ jobs:
         run: bunx turbo run build --filter='./packages/*'
 
       - name: Publish
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
           publish: bun run release
         env:
