@@ -1,3 +1,4 @@
+import { isDevEnv } from '../guards'
 import type { Emitter } from './emitter.types'
 
 /**
@@ -81,7 +82,7 @@ export function createTypedEmitter<E extends Record<string, unknown>>(
             } catch {}
             return
           }
-          if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
+          if (isDevEnv()) {
             console.error(`[UploadEngine] Error in event listener for "${type}":`, err)
           }
         }
@@ -89,7 +90,7 @@ export function createTypedEmitter<E extends Record<string, unknown>>(
 
       emitDepth++
       try {
-        if (emitDepth > MAX_EMIT_DEPTH && !warnedDepth && process.env['NODE_ENV'] !== 'production') {
+        if (emitDepth > MAX_EMIT_DEPTH && !warnedDepth && isDevEnv()) {
           warnedDepth = true
           console.warn(
             `[UploadEngine] emit depth exceeded ${MAX_EMIT_DEPTH} for "${type}". ` +

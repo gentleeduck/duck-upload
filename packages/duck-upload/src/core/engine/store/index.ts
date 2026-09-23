@@ -1,4 +1,5 @@
 import type { Contracts } from '../../contracts'
+import { isDevEnv } from '../../utils/guards'
 import type { Engine } from '../engine.types'
 import { dispatch as internalDispatch } from './store.dispatch'
 import { createStoreRuntime } from './store.runtime'
@@ -48,7 +49,7 @@ export function createUploadStore<
     try {
       plugin.setup(storeProxy)
     } catch (err) {
-      if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
+      if (isDevEnv()) {
         console.error(`[UploadEngine] Plugin "${plugin.name}" failed to setup:`, err)
       }
     }

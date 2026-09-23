@@ -4,6 +4,7 @@ export type SanitizeFilenameResult =
   | { safe: true; normalised: string }
   | { safe: false; normalised: string; reason: FilenameRejectReason }
 
+// TODO: use regex
 const RESERVED_WINDOWS_NAMES = new Set([
   'CON',
   'PRN',
