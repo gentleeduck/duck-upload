@@ -2,6 +2,7 @@ import type { Contracts } from '../../contracts'
 import { createXHRTransport } from '../../contracts/transport'
 import { deserializeSnapshot, serializeSnapshot } from '../../persistence'
 import { createTypedEmitter } from '../../utils/emitter'
+import { isDevEnv } from '../../utils/guards'
 import { resolveUploadConfig } from '../engine.libs'
 import type { Engine } from '../engine.types'
 import { createReducer } from '../reducer'
@@ -41,7 +42,7 @@ export function createStoreRuntime<
 
       await persistence.adapter.save(persistence.key, snap)
     } catch (err) {
-      if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
+      if (isDevEnv()) {
         console.warn('[UploadEngine] persistence flush failed:', err)
       }
     }
@@ -133,7 +134,7 @@ export function createStoreRuntime<
         try {
           await effect()
         } catch (err) {
-          if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
+          if (isDevEnv()) {
             const error = err instanceof Error ? err : new Error(String(err))
             const context = {
               queueLength: rt.effectQueue.length,

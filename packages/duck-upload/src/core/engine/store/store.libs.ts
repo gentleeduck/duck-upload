@@ -2,7 +2,7 @@ import type { Contracts } from '../../contracts'
 import type { UploadError } from '../../errors'
 import { DEFAULT_RETRY_DELAY_BASE_MS, DEFAULT_RETRY_DELAY_MAX_MS } from '../../utils/constants'
 import { computeFingerprint, fingerprintMatches } from '../../utils/fingerprint'
-import { isRecord } from '../../utils/guards'
+import { isDevEnv, isRecord } from '../../utils/guards'
 import { hashBlob } from '../../utils/hash'
 import type { Engine } from '../engine.types'
 import type { Store } from './store.types'
@@ -125,7 +125,7 @@ export async function tryDedupeByChecksum<
     rt.applyInternal({ type: 'dedupe.ok', localId, result: existingFile })
     return true
   } catch (err) {
-    if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
+    if (isDevEnv()) {
       console.warn('[UploadEngine] Failed to check for existing file:', err)
     }
     return false

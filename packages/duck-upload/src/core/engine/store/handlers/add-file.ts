@@ -1,4 +1,5 @@
 import type { Contracts } from '../../../contracts'
+import { isDevEnv } from '../../../utils/guards'
 import { generateId } from '../../../utils/id'
 import { validateFile, validateFileList, validateMimeSignature } from '../../validation'
 import { calculateFileChecksum, computeFingerprint, tryDedupeByChecksum } from '../store.libs'
@@ -51,7 +52,7 @@ export function handleAddFiles<
         rt.applyInternal({ type: 'fingerprint.updated', localId, fingerprint: updatedFingerprint })
       } catch (err) {
         // Checksum failure is non-fatal  continue without dedupe.
-        if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
+        if (isDevEnv()) {
           console.warn('[UploadEngine] Failed to calculate checksum:', err)
         }
       }
@@ -82,7 +83,7 @@ export function handleAddFiles<
         }
       } catch (err) {
         // Sniff failure is non-fatal  fall through.
-        if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'development') {
+        if (isDevEnv()) {
           console.warn('[UploadEngine] MIME sniff failed:', err)
         }
       }
